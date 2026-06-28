@@ -523,7 +523,7 @@ function App() {
             <div style={{ width: '70%', zIndex: 2 }}>
               <h2 style={{ fontSize: 26, fontStyle: 'italic', fontWeight: 900, letterSpacing: '-0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>FARM FRESH</h2>
               <p className="mb-3" style={{ fontWeight: 600, fontSize: 13, opacity: 0.95, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>DELIVERED TO YOU</p>
-              <button style={{ backgroundColor: 'white', color: '#0f823a', padding: '8px 20px', borderRadius: '24px', fontWeight: '800', fontSize: '13px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>Order Now</button>
+              <button onClick={() => setActiveTab('category')} style={{ backgroundColor: 'white', color: '#0f823a', padding: '8px 20px', borderRadius: '24px', fontWeight: '800', fontSize: '13px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>Order Now</button>
             </div>
           </div>
 
