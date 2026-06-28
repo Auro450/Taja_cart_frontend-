@@ -76,6 +76,7 @@ body {
 .header-bg {
   background: linear-gradient(135deg, #a7dfbc 0%, #def0e5 100%);
   padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   position: sticky;
