@@ -484,7 +484,8 @@ body {
   background: var(--white);
   display: flex;
   justify-content: space-around;
-  padding: 10px 0 20px;
+  padding: 10px 0;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border-color);
   z-index: 20;
 }
