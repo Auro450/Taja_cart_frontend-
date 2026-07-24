@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+import { generateInvoice } from './utils/generateInvoice';
 
 // Custom hook to sync state with localStorage
 function useLocalStorage(key, initialValue) {
@@ -24,63 +27,88 @@ function useLocalStorage(key, initialValue) {
 }
 import { Search, ChevronDown, User, Heart, ShoppingBag, MapPin, Grid, PlayCircle, Tag, Zap, ChevronUp, ShoppingCart, Leaf, Timer, Shield, Home, ArrowLeft, X } from 'lucide-react';
 
-const categoryData = {
-  'Veggies': [
-    { name: 'Pumpkin', quantity: '500 grams', currentPrice: 25, originalPrice: 35, discount: '₹10 OFF', image: '/products/pumpkin.png' },
-    { name: 'Green chilli (Grade - A)', quantity: '100 grams', currentPrice: 15, originalPrice: 25, discount: '₹10 OFF', image: '/products/chilli.png' },
-    { name: 'Garlic', quantity: '250 grams', currentPrice: 50, originalPrice: 70, discount: '₹20 OFF', image: '/products/garlic.png' },
-    { name: 'Cucumber', quantity: '1 kg', currentPrice: 80, originalPrice: 110, discount: '₹30 OFF', image: '/products/cucumber.png' },
-    { name: 'Carrot', quantity: '500 grams', currentPrice: 30, originalPrice: 45, discount: '₹15 OFF', image: '/products/carrot.png' },
-    { name: 'Lau', quantity: '500 grams', currentPrice: 30, originalPrice: 40, discount: '₹10 OFF', image: '/products/lau.png' },
-    { name: 'Potato', quantity: '1 kg', currentPrice: 20, originalPrice: 35, discount: '₹15 OFF', image: '/products/potato.png' },
-    { name: 'Ginger', quantity: '250 grams', currentPrice: 35, originalPrice: 50, discount: '₹15 OFF', image: '/products/ginger.png' },
-    { name: 'Beans', quantity: '100 grams', currentPrice: 15, originalPrice: 20, discount: '₹5 OFF', image: '/products/beans.png' },
-    { name: 'Tomato', quantity: '1 kg', currentPrice: 50, originalPrice: 70, discount: '₹20 OFF', image: '/products/tomato.png' },
-    { name: 'Green Pepe', quantity: '1 kg', currentPrice: 35, originalPrice: 50, discount: '₹15 OFF', image: '/products/papaya.png' },
-    { name: 'Green chilli (Grade - A)', quantity: '1 piece', currentPrice: 8, originalPrice: 12, discount: '₹4 OFF', image: '/products/chilli.png' },
-    { name: 'Kalmi Saag', quantity: '1 bunch', currentPrice: 10, originalPrice: 15, discount: '₹5 OFF', image: '/products/kalmi.png' },
-    { name: 'Dhaniya Pata', quantity: '100 grams', currentPrice: 20, originalPrice: 28, discount: '₹8 OFF', image: '/products/dhaniya.png' },
-    { name: 'Begun', quantity: '500 grams', currentPrice: 35, originalPrice: 45, discount: '₹10 OFF', image: '/products/begun.png' },
-    { name: 'Corola', quantity: '1 kg', currentPrice: 55, originalPrice: 70, discount: '₹15 OFF', image: '/products/corola.png' },
-    { name: 'Lady Finger', quantity: '1 kg', currentPrice: 55, originalPrice: 75, discount: '₹20 OFF', image: '/products/ladyfinger.png' },
-    { name: 'Potol', quantity: '500 grams', currentPrice: 30, originalPrice: 45, discount: '₹15 OFF', image: '/products/parwal.png' },
-    { name: 'Onion', quantity: '1 kg', currentPrice: 35, originalPrice: 50, discount: '₹15 OFF', image: '/products/onion.png' },
-  ],
-  'Fruits': [
-    { name: 'Lucknow Mango', quantity: '1 kg', currentPrice: 50, originalPrice: 65, discount: '₹15 OFF', image: '/products/mango.png' },
-    { name: 'Watermelon', quantity: '1 kg', currentPrice: 50, originalPrice: 65, discount: '₹15 OFF', image: '/products/watermelon.png' },
-    { name: 'Premium Kashmiri Apple', quantity: '1 kg', currentPrice: 320, originalPrice: 400, discount: '₹80 OFF', image: '/products/apple.png' },
-  ],
-  'Grocery': [
-    { name: 'Rice', quantity: '1 kg', currentPrice: 100, originalPrice: 125, discount: '₹25 OFF', image: '/products/rice.png' },
-    { name: 'Wheat', quantity: '1 kg', currentPrice: 100, originalPrice: 125, discount: '₹25 OFF', image: '/products/wheat.png' },
-    { name: 'Bread', quantity: '500 grams', currentPrice: 50, originalPrice: 60, discount: '₹10 OFF', image: '/products/bread.png' },
-  ],
-  'Milk products': [
-    { name: 'Pure Cow Milk', quantity: '500 ml', currentPrice: 30, originalPrice: 38, discount: '₹8 OFF', image: '/products/milk.png' },
-    { name: 'Ghee', quantity: '1 kg', currentPrice: 120, originalPrice: 150, discount: '₹30 OFF', image: '/products/ghee.png' },
-    { name: 'Butter', quantity: '500 grams', currentPrice: 60, originalPrice: 75, discount: '₹15 OFF', image: '/products/butter.png' },
-    { name: 'Paneer', quantity: '1 kg', currentPrice: 100, originalPrice: 125, discount: '₹25 OFF', image: '/products/paneer.png' },
-  ],
-  'Meat': [
-    { name: 'Whole Chicken', quantity: '1 kg', currentPrice: 200, originalPrice: 250, discount: '₹50 OFF', image: '/products/whole_chicken.png' },
-    { name: 'Cut Chicken', quantity: '1 kg', currentPrice: 250, originalPrice: 300, discount: '₹50 OFF', image: '/products/cut_chicken.png' },
-    { name: 'Whole Mutton', quantity: '1 kg', currentPrice: 800, originalPrice: 950, discount: '₹150 OFF', image: '/products/mutton.png' },
-    { name: 'Cut Mutton', quantity: '1 kg', currentPrice: 1000, originalPrice: 1200, discount: '₹200 OFF', image: '/products/cut_mutton.png' },
-  ],
-  'Fish': [
-    { name: 'Rohu', quantity: '1 kg', currentPrice: 200, originalPrice: 250, discount: '₹50 OFF', image: '/products/rohu.png' },
-    { name: 'Katla', quantity: '1 kg', currentPrice: 250, originalPrice: 300, discount: '₹50 OFF', image: '/products/katla.png' },
-    { name: 'Chingri', quantity: '1 kg', currentPrice: 800, originalPrice: 950, discount: '₹150 OFF', image: '/products/chingri.png' },
-    { name: 'Elish', quantity: '1 kg', currentPrice: 1000, originalPrice: 1200, discount: '₹200 OFF', image: '/products/elish.png' },
-  ],
-  'Eggs': [
-    { name: 'Chicken Eggs', quantity: '12 pcs', currentPrice: 70, originalPrice: 90, discount: '₹20 OFF', image: '/products/chicken_eggs.png' },
-    { name: 'Duck Eggs', quantity: '12 pcs', currentPrice: 100, originalPrice: 125, discount: '₹25 OFF', image: '/products/duck_eggs.png' },
-  ],
-  'Flowers': [
-    { name: 'Genda phool', quantity: '1 pc mala', currentPrice: 30, originalPrice: 40, discount: '₹10 OFF', image: '/products/genda_phool.png' },
-  ]
+// categoryData has been moved to the backend database
+
+const OrderRatingWidget = ({ order, onReviewSubmitted }) => {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [review, setReview] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (order.rating) {
+    return (
+      <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#334155' }}>Your Review</h4>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+          {[1, 2, 3, 4, 5].map(star => (
+            <span key={star} style={{ color: star <= order.rating ? '#eab308' : '#cbd5e1', fontSize: '16px' }}>★</span>
+          ))}
+        </div>
+        {order.review && <p style={{ margin: '0', fontSize: '13px', color: '#475569', fontStyle: 'italic' }}>"{order.review}"</p>}
+      </div>
+    );
+  }
+
+  const submitReview = async () => {
+    if (!rating) {
+      alert("Please select a rating.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await fetch(`http://localhost:3000/api/orders/${order.id}/rate`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, review })
+      });
+      if (response.ok) {
+        onReviewSubmitted(order.id, rating, review);
+      } else {
+        alert("Failed to submit review.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error.");
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#166534' }}>Rate this Order</h4>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        {[1, 2, 3, 4, 5].map(star => (
+          <span 
+            key={star} 
+            onClick={() => setRating(star)}
+            onMouseEnter={() => setHoverRating(star)}
+            onMouseLeave={() => setHoverRating(0)}
+            style={{ 
+              cursor: 'pointer', 
+              color: star <= (hoverRating || rating) ? '#eab308' : '#cbd5e1', 
+              fontSize: '24px',
+              transition: 'color 0.2s'
+            }}
+          >
+            ★
+          </span>
+        ))}
+      </div>
+      <textarea 
+        placeholder="Write a review (optional)..."
+        value={review}
+        onChange={(e) => setReview(e.target.value)}
+        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', minHeight: '60px', marginBottom: '8px', resize: 'vertical', boxSizing: 'border-box' }}
+      />
+      <button 
+        onClick={submitReview}
+        disabled={submitting || !rating}
+        style={{ width: '100%', backgroundColor: rating ? '#16a34a' : '#94a3b8', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: rating ? 'pointer' : 'not-allowed', fontSize: '13px', boxSizing: 'border-box' }}
+      >
+        {submitting ? 'Submitting...' : 'Submit Review'}
+      </button>
+    </div>
+  );
 };
 
 function App() {
@@ -100,11 +128,52 @@ function App() {
   });
 
   // Orders State
-  const [placedOrders, setPlacedOrders] = useLocalStorage('placedOrders', []);
+  const [placedOrders, setPlacedOrders] = useState([]);
 
   // User Authentication State
   const [user, setUser] = useLocalStorage('user', null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryData, setCategoryData] = useState({});
+  const [categoryList, setCategoryList] = useState([]);
+
+  // Fetch Inventory from Backend
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const [catRes, prodRes] = await Promise.all([
+          fetch('http://localhost:3000/api/categories'),
+          fetch('http://localhost:3000/api/products')
+        ]);
+        const categories = await catRes.json();
+        const products = await prodRes.json();
+        
+        const newCategoryData = {};
+        categories.forEach(c => {
+          newCategoryData[c.name] = products.filter(p => p.category_id === c.id);
+        });
+        
+        setCategoryData(newCategoryData);
+        setCategoryList(categories);
+      } catch (error) {
+        console.error("Error fetching inventory:", error);
+      }
+    };
+    fetchInventory();
+  }, []);
+
+  // Fetch Orders from Backend
+  useEffect(() => {
+    if (user && user.phone) {
+      fetch(`http://localhost:3000/api/orders/user/${user.phone}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setPlacedOrders(data);
+        })
+        .catch(err => console.error("Error fetching orders:", err));
+    } else {
+      setPlacedOrders([]);
+    }
+  }, [user, activeTab]); // Re-fetch on tab switch or user change
 
   // Collect all unique products for search
   const searchResults = useMemo(() => {
@@ -126,10 +195,16 @@ function App() {
   
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authStep, setAuthStep] = useState('phone'); // 'phone' or 'otp'
-  const [authForm, setAuthForm] = useState({ name: '', phone: '', otp: '' });
+  const [isCollectingPhone, setIsCollectingPhone] = useState(false);
+  const [tempUser, setTempUser] = useState(null);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [pendingRatingOrder, setPendingRatingOrder] = useState(null);
+  
+  // Profile State
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [editPhoneInput, setEditPhoneInput] = useState('');
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!user) {
       setIsAuthModalOpen(true);
       return;
@@ -145,25 +220,58 @@ function App() {
       date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       items: cartDetails.items,
       grandTotal: cartDetails.grandTotal,
-      deliveryDetails: { ...deliveryDetails }
+      deliveryDetails: { ...deliveryDetails, email: user.email }
     };
 
-    setPlacedOrders([newOrder, ...placedOrders]);
-    setCart({});
-    setAppliedCoupon(null);
-    setCouponCode('');
-    setActiveTab('orders');
+    try {
+      const response = await fetch('http://localhost:3000/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder)
+      });
+      if (response.ok) {
+        const freshOrder = {...newOrder, status: 'Placed'};
+        setPlacedOrders([freshOrder, ...placedOrders]);
+        setCart({});
+        setAppliedCoupon(null);
+        setCouponCode('');
+        setActiveTab('orders');
+        setPendingRatingOrder(freshOrder);
+      } else {
+        alert("Failed to place order.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error. Please try again.");
+    }
+  };
+
+  const handleReviewSubmitted = (orderId, rating, review) => {
+    setPlacedOrders(placedOrders.map(o => 
+      o.id === orderId ? { ...o, rating, review } : o
+    ));
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (window.confirm("Are you sure you want to cancel this order?")) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/orders/${orderId}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          setPlacedOrders(placedOrders.filter(o => o.id !== orderId));
+        } else {
+          alert("Failed to cancel order.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Network error. Please try again.");
+      }
+    }
   };
 
   const downloadInvoice = (order) => {
-    const invoiceText = `TAAJA CART - INVOICE\nOrder ID: ${order.id}\nDate: ${order.date}\n\nDelivery To:\n${order.deliveryDetails.name}\n${order.deliveryDetails.phone}\n${order.deliveryDetails.address}\nLandmark: ${order.deliveryDetails.landmark || 'N/A'}\n\nItems:\n${order.items.map(item => `${item.qty}x ${item.name} - ₹${item.currentPrice * item.qty}`).join('\n')}\n\nGrand Total: ₹${order.grandTotal}\n\nThank you for shopping with us!`;
-    const element = document.createElement('a');
-    const file = new Blob([invoiceText], {type: 'text/plain'});
-    element.href = URL.createObjectURL(file);
-    element.download = `Invoice_${order.id}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    generateInvoice(order);
   };
 
   const handleApplyCoupon = () => {
@@ -219,56 +327,85 @@ function App() {
 
   const allList = React.useMemo(() => {
     const allProducts = Object.values(categoryData).flat();
-    return allProducts.sort(() => 0.5 - Math.random()).slice(0, 8);
-  }, []);
+    return allProducts.sort(() => 0.5 - Math.random());
+  }, [categoryData]);
 
   const dealsOfTheDay = React.useMemo(() => {
     const allProducts = Object.values(categoryData).flat();
     return allProducts.sort(() => 0.5 - Math.random()).slice(0, 10);
-  }, []);
+  }, [categoryData]);
 
   const categories = [
     { name: 'All', iconUrl: '/category-icons/all.png' },
-    { name: 'Veggies', iconUrl: '/category-icons/veggies.png' },
-    { name: 'Fruits', iconUrl: '/category-icons/fruits.png' },
-    { name: 'Grocery', iconUrl: '/category-icons/grocery.png' },
-    { name: 'Milk products', iconUrl: '/category-icons/milk.png' },
-    { name: 'Meat', iconUrl: '/category-icons/meat.png' },
-    { name: 'Fish', iconUrl: '/category-icons/fish.png' },
-    { name: 'Eggs', iconUrl: '/category-icons/eggs.png' },
-    { name: 'Flowers', iconUrl: '/category-icons/flowers.png' },
+    ...categoryList.map(c => ({
+      name: c.name,
+      iconUrl: c.image ? (c.image.startsWith('/uploads') ? `http://localhost:3000${c.image}` : c.image) : '/category-icons/all.png'
+    }))
   ];
 
   const currentProductList = activeCategory === 'All' ? allList : (categoryData[activeCategory] || []);
 
-  const handleSendOtp = () => {
-    if (!authForm.name || !authForm.phone) {
-      alert("Please enter your Name and Phone Number");
-      return;
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const decoded = jwtDecode(credentialResponse.credential);
+    try {
+      const response = await fetch(`http://localhost:3000/api/customers/${decoded.email}`);
+      if (response.ok) {
+        const customer = await response.json();
+        setUser({ name: decoded.name, email: decoded.email, picture: decoded.picture, phone: customer.phone });
+        setDeliveryDetails(prev => ({ ...prev, name: decoded.name, phone: customer.phone }));
+        setIsAuthModalOpen(false);
+      } else {
+        setTempUser({ name: decoded.name, email: decoded.email, picture: decoded.picture });
+        setIsCollectingPhone(true);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error checking customer details.");
     }
-    setAuthStep('otp');
   };
 
-  const handleVerifyOtp = () => {
-    if (authForm.otp === '1234') {
-      setUser({ name: authForm.name, phone: authForm.phone });
-      setIsAuthModalOpen(false);
-      setAuthStep('phone');
-
-      // Try to find a previous order from this phone number to restore their address
-      const pastOrder = placedOrders.find(o => o.deliveryDetails && o.deliveryDetails.phone === authForm.phone);
-      
-      setDeliveryDetails({
-        name: authForm.name,
-        phone: authForm.phone,
-        address: pastOrder ? pastOrder.deliveryDetails.address : '',
-        landmark: pastOrder ? pastOrder.deliveryDetails.landmark : ''
-      });
-
-      setAuthForm({ name: '', phone: '', otp: '' });
-    } else {
-      alert("Invalid OTP! Try 1234");
+  const handleSavePhone = async () => {
+    if (!phoneInput || phoneInput.length < 10) {
+      alert("Please enter a valid 10-digit phone number");
+      return;
     }
+    const finalUser = { ...tempUser, phone: phoneInput };
+    
+    try {
+      const response = await fetch('http://localhost:3000/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalUser)
+      });
+      if (response.ok) {
+        setUser(finalUser);
+        setIsCollectingPhone(false);
+        setIsAuthModalOpen(false);
+        setDeliveryDetails(prev => ({ ...prev, name: finalUser.name, phone: finalUser.phone }));
+        setPhoneInput('');
+        setTempUser(null);
+      } else {
+        alert("Failed to save phone number.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error.");
+    }
+  };
+  
+  const handleUpdatePhone = () => {
+    if (!editPhoneInput || editPhoneInput.length < 10) {
+      alert("Please enter a valid 10-digit phone number");
+      return;
+    }
+    setUser({ ...user, phone: editPhoneInput });
+    setDeliveryDetails({ ...deliveryDetails, phone: editPhoneInput });
+    setIsEditingPhone(false);
+  };
+
+  const handleGoogleError = () => {
+    console.log('Login Failed');
+    alert("Google Login Failed");
   };
 
   const userOrders = user ? placedOrders.filter(o => o.deliveryDetails && o.deliveryDetails.phone === user.phone) : [];
@@ -411,7 +548,7 @@ function App() {
                   <div key={idx} className="product-card">
                     <div className="product-image-container">
                       {item.image ? (
-                        <img src={item.image} alt={item.name} className="product-image" />
+                        <img src={item.image?.startsWith('/uploads') ? `http://localhost:3000${item.image}` : item.image} alt={item.name} className="product-image" />
                       ) : (
                         <span style={{ fontSize: '48px' }}>{item.emoji}</span>
                       )}
@@ -478,7 +615,7 @@ function App() {
               <div key={idx} className="product-card">
                 <div className="product-image-container">
                   {product.image ? (
-                    <img src={product.image} alt={product.name} className="product-image" />
+                    <img src={product.image?.startsWith('/uploads') ? `http://localhost:3000${product.image}` : product.image} alt={product.name} className="product-image" />
                   ) : (
                     <span style={{ fontSize: '48px' }}>{product.emoji}</span>
                   )}
@@ -495,8 +632,15 @@ function App() {
                   )}
                 </div>
                 <div className="product-details">
-                  <div className="price-row">
-                    <span className="current-price">₹{product.currentPrice}</span>
+                  <div className="price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="current-price">₹{product.currentPrice}</span>
+                      <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹{product.cutPrice}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 'bold' }}>{product.rating}</span>
+                      <span style={{ fontSize: '10px' }}>⭐</span>
+                    </div>
                   </div>
                   <h3 className="product-name">{product.name}</h3>
                   <p className="product-quantity">{product.quantity}</p>
@@ -578,7 +722,7 @@ function App() {
             <div key={idx} className="product-card">
               <div className="product-image-container">
                 {product.image ? (
-                  <img src={product.image} alt={product.name} className="product-image" />
+                  <img src={product.image?.startsWith('/uploads') ? `http://localhost:3000${product.image}` : product.image} alt={product.name} className="product-image" />
                 ) : (
                   <span style={{ fontSize: '48px' }}>{product.emoji}</span>
                 )}
@@ -595,8 +739,15 @@ function App() {
                 )}
               </div>
               <div className="product-details">
-                <div className="price-row">
-                  <span className="current-price">₹{product.currentPrice}</span>
+                <div className="price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="current-price">₹{product.currentPrice}</span>
+                    <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹200</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 'bold' }}>{(4 + (product.name.charCodeAt(0) % 10) / 10).toFixed(1)}</span>
+                    <span style={{ fontSize: '10px' }}>⭐</span>
+                  </div>
                 </div>
                 <h3 className="product-name">{product.name}</h3>
                 <p className="product-quantity">{product.quantity}</p>
@@ -698,7 +849,7 @@ function App() {
                 <div key={idx} className="product-card" style={{ minWidth: 'auto', width: '100%', maxWidth: '100%', margin: 0 }}>
                   <div className="product-image-container">
                     {product.image ? (
-                      <img src={product.image} alt={product.name} className="product-image" />
+                      <img src={product.image?.startsWith('/uploads') ? `http://localhost:3000${product.image}` : product.image} alt={product.name} className="product-image" />
                     ) : (
                       <span style={{ fontSize: '48px' }}>{product.emoji}</span>
                     )}
@@ -715,8 +866,15 @@ function App() {
                     )}
                   </div>
                   <div className="product-details">
-                    <div className="price-row">
-                      <span className="current-price">₹{product.currentPrice}</span>
+                    <div className="price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className="current-price">₹{product.currentPrice}</span>
+                        <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹200</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px' }}>
+                        <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 'bold' }}>{(4 + (product.name.charCodeAt(0) % 10) / 10).toFixed(1)}</span>
+                        <span style={{ fontSize: '10px' }}>⭐</span>
+                      </div>
                     </div>
                     <h3 className="product-name">{product.name}</h3>
                     <p className="product-quantity">{product.quantity}</p>
@@ -757,7 +915,7 @@ function App() {
               <div className="cart-items-section" style={{ padding: '0', backgroundColor: 'transparent', marginBottom: '24px' }}>
                 {cartDetails.items.map((item, idx) => (
                   <div key={idx} className="cart-item-row-new">
-                    <img src={item.image} alt={item.name} className="cart-item-image" />
+                    <img src={item.image?.startsWith('/uploads') ? `http://localhost:3000${item.image}` : item.image} alt={item.name} className="cart-item-image" />
                     <div className="cart-item-info">
                       <h4 className="cart-item-name">{item.name}</h4>
                       <p className="cart-item-qty">{item.quantity}</p>
@@ -894,7 +1052,16 @@ function App() {
                         <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--primary)' }}>{order.id}</span>
                         <p style={{ fontSize: '12px', color: 'var(--gray-text)', margin: '4px 0 0 0' }}>{order.date}</p>
                       </div>
-                      <span style={{ backgroundColor: '#f0fdf4', color: 'var(--primary-green)', padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '700' }}>Placed</span>
+                      <span style={{ 
+                        backgroundColor: order.status === 'Delivered' ? '#dcfce7' : order.status === 'Picked Up' ? '#fef9c3' : '#f0fdf4', 
+                        color: order.status === 'Delivered' ? '#16a34a' : order.status === 'Picked Up' ? '#ca8a04' : 'var(--primary-green)', 
+                        padding: '4px 12px', 
+                        borderRadius: '16px', 
+                        fontSize: '12px', 
+                        fontWeight: '700' 
+                      }}>
+                        {order.status || 'Placed'}
+                      </span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
@@ -911,12 +1078,25 @@ function App() {
                         <span style={{ fontSize: '13px', color: 'var(--gray-text)' }}>{order.items.reduce((sum, item) => sum + item.qty, 0)} Items</span>
                         <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary)' }}>Total: ₹{order.grandTotal}</span>
                       </div>
-                      <button 
-                        onClick={() => downloadInvoice(order)}
-                        style={{ width: '100%', backgroundColor: 'var(--white)', border: '1px solid var(--primary-green)', color: 'var(--primary-green)', padding: '10px', borderRadius: '8px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', textAlign: 'center' }}
-                      >
-                        Download Invoice
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {order.status === 'Delivered' && (
+                          <button 
+                            onClick={() => downloadInvoice(order)}
+                            style={{ flex: 1, backgroundColor: 'var(--white)', border: '1px solid var(--primary-green)', color: 'var(--primary-green)', padding: '10px', borderRadius: '8px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            Download Invoice
+                          </button>
+                        )}
+                        {(!order.status || order.status === 'Placed') && (
+                          <button 
+                            onClick={() => cancelOrder(order.id)}
+                            style={{ flex: 1, backgroundColor: '#fee2e2', border: '1px solid #ef4444', color: '#b91c1c', padding: '10px', borderRadius: '8px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', textAlign: 'center' }}
+                          >
+                            Cancel Order
+                          </button>
+                        )}
+                      </div>
+                      <OrderRatingWidget order={order} onReviewSubmitted={handleReviewSubmitted} />
                     </div>
                   </div>
                 ))}
@@ -936,12 +1116,41 @@ function App() {
             {user ? (
               <div style={{ backgroundColor: 'var(--white)', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'var(--light-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-green)' }}>
-                    <User size={32} />
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'var(--light-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-green)', overflow: 'hidden' }}>
+                    {user.picture ? <img src={user.picture} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={32} />}
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary)' }}>{user.name}</h3>
-                    <p style={{ margin: '4px 0 0 0', color: 'var(--gray-text)', fontSize: '14px' }}>+91 {user.phone}</p>
+                    <p style={{ margin: '4px 0 0 0', color: 'var(--gray-text)', fontSize: '14px' }}>{user.email}</p>
+                    
+                    {isEditingPhone ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '14px', color: 'var(--gray-text)' }}>+91</span>
+                        <input 
+                          type="tel" 
+                          value={editPhoneInput}
+                          onChange={(e) => setEditPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          maxLength={10}
+                          style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '4px 8px', fontSize: '14px', width: '120px' }}
+                          autoFocus
+                        />
+                        <button onClick={handleUpdatePhone} style={{ background: 'var(--primary-green)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Save</button>
+                        <button onClick={() => setIsEditingPhone(false)} style={{ background: '#f1f5f9', color: 'var(--gray-text)', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        <p style={{ margin: 0, color: 'var(--gray-text)', fontSize: '14px' }}>+91 {user.phone}</p>
+                        <button 
+                          onClick={() => {
+                            setEditPhoneInput(user.phone || '');
+                            setIsEditingPhone(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--primary-green)', fontSize: '12px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
@@ -1001,22 +1210,26 @@ function App() {
           <div className="auth-backdrop" onClick={() => setIsAuthModalOpen(false)} />
           <div className="auth-bottom-sheet">
             <div className="auth-header">
-              <h3>{authStep === 'phone' ? 'Login or Sign up' : 'Verify OTP'}</h3>
+              <h3>Sign in with Google</h3>
               <button className="close-auth-btn" onClick={() => setIsAuthModalOpen(false)}>×</button>
             </div>
             
-            <div className="auth-body">
-              {authStep === 'phone' ? (
+            <div className="auth-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0' }}>
+              {!isCollectingPhone ? (
                 <>
-                  <div className="input-group">
-                    <label>Full Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="Enter your name" 
-                      value={authForm.name} 
-                      onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                    />
-                  </div>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                  />
+                  <p className="auth-terms" style={{ marginTop: '20px' }}>
+                    By continuing, you agree to our Terms of Service & Privacy Policy
+                  </p>
+                </>
+              ) : (
+                <div style={{ width: '100%', padding: '0 20px' }}>
+                  <p style={{ marginBottom: '16px', textAlign: 'center', color: '#64748b' }}>
+                    Please enter your phone number to continue
+                  </p>
                   <div className="input-group">
                     <label>Phone Number</label>
                     <div className="phone-input-wrapper">
@@ -1024,34 +1237,40 @@ function App() {
                       <input 
                         type="tel" 
                         placeholder="10 digit mobile number" 
-                        value={authForm.phone} 
-                        onChange={(e) => setAuthForm({...authForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                        value={phoneInput} 
+                        onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         maxLength={10}
                       />
                     </div>
                   </div>
-                  <button className="primary-btn mt-4" onClick={handleSendOtp}>Continue</button>
-                  <p className="auth-terms">By continuing, you agree to our Terms of Service & Privacy Policy</p>
-                </>
-              ) : (
-                <>
-                  <p className="otp-subtitle">Enter the 4-digit code sent to +91 {authForm.phone}</p>
-                  <div className="input-group">
-                    <label>OTP</label>
-                    <input 
-                      type="tel" 
-                      placeholder="e.g. 1234" 
-                      value={authForm.otp} 
-                      onChange={(e) => setAuthForm({...authForm, otp: e.target.value.replace(/\D/g, '').slice(0, 4)})}
-                      maxLength={4}
-                      style={{ letterSpacing: '8px', fontSize: '20px', textAlign: 'center' }}
-                    />
-                  </div>
-                  <button className="primary-btn mt-4" onClick={handleVerifyOtp}>Verify & Login</button>
-                  <p className="auth-terms"><span style={{ color: 'var(--primary-green)', cursor: 'pointer' }} onClick={() => setAuthStep('phone')}>Edit Phone Number</span></p>
-                </>
+                  <button className="primary-btn mt-4" onClick={handleSavePhone} style={{ width: '100%' }}>Save & Continue</button>
+                </div>
               )}
             </div>
+          </div>
+        </>
+      )}
+      {/* Rating Modal */}
+      {pendingRatingOrder && (
+        <>
+          <div className="auth-overlay" onClick={() => setPendingRatingOrder(null)} />
+          <div className="auth-modal" style={{ padding: '20px', borderRadius: '12px', width: '90%', maxWidth: '400px', backgroundColor: 'white', position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1001 }}>
+            <button className="close-btn" onClick={() => setPendingRatingOrder(null)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={24} /></button>
+            <h2 style={{ marginBottom: '8px', fontSize: '20px', color: '#0f172a' }}>Order Placed! 🎉</h2>
+            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '16px' }}>Would you like to rate your experience?</p>
+            <OrderRatingWidget 
+              order={pendingRatingOrder} 
+              onReviewSubmitted={(orderId, rating, review) => {
+                handleReviewSubmitted(orderId, rating, review);
+                setPendingRatingOrder(null);
+              }} 
+            />
+            <button 
+              onClick={() => setPendingRatingOrder(null)}
+              style={{ width: '100%', marginTop: '12px', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
+            >
+              Skip for now
+            </button>
           </div>
         </>
       )}
