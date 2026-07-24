@@ -181,7 +181,30 @@ function Orders() {
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#334155' }}>Customer Details</h4>
                   <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#475569' }}><strong>Name:</strong> {order.deliveryDetails?.name || 'N/A'}</p>
                   <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#475569' }}><strong>Phone:</strong> +91 {order.deliveryDetails?.phone || order.userPhone || 'N/A'}</p>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#475569' }}><strong>Address:</strong> {order.deliveryDetails?.address || 'N/A'} {order.deliveryDetails?.landmark ? `(${order.deliveryDetails.landmark})` : ''}</p>
+                  <div style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#475569' }}>
+                    <strong>Address:</strong> 
+                    {order.deliveryDetails?.street ? (
+                      <div style={{ marginLeft: '8px', marginTop: '4px', lineHeight: '1.4' }}>
+                        {order.deliveryDetails?.building && <>{order.deliveryDetails.building},<br/></>}
+                        {order.deliveryDetails?.street},<br/>
+                        {order.deliveryDetails?.locality && <>{order.deliveryDetails.locality},<br/></>}
+                        {order.deliveryDetails?.landmark && <>Landmark: {order.deliveryDetails.landmark}<br/></>}
+                        {order.deliveryDetails?.city}, {order.deliveryDetails?.state}
+                      </div>
+                    ) : (
+                      <span> {order.deliveryDetails?.address || 'N/A'} {order.deliveryDetails?.landmark ? `(${order.deliveryDetails.landmark})` : ''}</span>
+                    )}
+                  </div>
+                  {order.deliveryDetails?.lat && order.deliveryDetails?.lng && (
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${order.deliveryDetails.lat},${order.deliveryDetails.lng}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ display: 'inline-block', marginTop: '8px', padding: '6px 12px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px' }}
+                    >
+                      📍 View on Google Maps
+                    </a>
+                  )}
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>

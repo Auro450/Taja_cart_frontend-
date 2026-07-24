@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { GoogleLogin } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from "jwt-decode";
+import AddressMap from './components/AddressMap';
 import { generateInvoice } from './utils/generateInvoice';
 
 // Custom hook to sync state with localStorage
@@ -123,8 +124,14 @@ function App() {
   const [deliveryDetails, setDeliveryDetails] = useLocalStorage('deliveryDetails', {
     name: '',
     phone: '',
-    address: '',
-    landmark: ''
+    street: '',
+    building: '',
+    locality: '',
+    landmark: '',
+    city: '',
+    state: '',
+    lat: null,
+    lng: null
   });
 
   // Orders State
@@ -210,8 +217,8 @@ function App() {
       return;
     }
 
-    if (!deliveryDetails.name || !deliveryDetails.phone || !deliveryDetails.address) {
-      alert("Please fill in your Name, Phone Number, and Full Address.");
+    if (!deliveryDetails.name || !deliveryDetails.phone || !deliveryDetails.street || !deliveryDetails.city) {
+      alert("Please fill in your Name, Phone Number, Street, and City.");
       return;
     }
 
@@ -957,6 +964,7 @@ function App() {
               {/* Delivery Details */}
               <div className="delivery-details-section" style={{ backgroundColor: 'var(--white)', padding: '16px', borderRadius: '12px', marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary)', margin: '0 0 16px 0' }}>Delivery Details</h3>
+                <AddressMap lat={deliveryDetails.lat} lng={deliveryDetails.lng} onChange={(lat, lng) => setDeliveryDetails({...deliveryDetails, lat, lng})} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <input 
                     type="text" 
@@ -973,20 +981,52 @@ function App() {
                     maxLength={10}
                     onChange={(e) => setDeliveryDetails({...deliveryDetails, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
                   />
-                  <textarea 
-                    placeholder="Full Address (House No, Building, Street)" 
+                  <input 
+                    type="text" 
+                    placeholder="Street Name" 
                     className="delivery-input"
-                    style={{ resize: 'none', height: '60px' }}
-                    value={deliveryDetails.address}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, address: e.target.value})}
+                    value={deliveryDetails.street || ''}
+                    onChange={(e) => setDeliveryDetails({...deliveryDetails, street: e.target.value})}
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Building Name / House No" 
+                    className="delivery-input"
+                    value={deliveryDetails.building || ''}
+                    onChange={(e) => setDeliveryDetails({...deliveryDetails, building: e.target.value})}
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Locality / Area" 
+                    className="delivery-input"
+                    value={deliveryDetails.locality || ''}
+                    onChange={(e) => setDeliveryDetails({...deliveryDetails, locality: e.target.value})}
                   />
                   <input 
                     type="text" 
                     placeholder="Landmark (Optional)" 
                     className="delivery-input"
-                    value={deliveryDetails.landmark}
+                    value={deliveryDetails.landmark || ''}
                     onChange={(e) => setDeliveryDetails({...deliveryDetails, landmark: e.target.value})}
                   />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="City" 
+                      className="delivery-input"
+                      style={{ flex: 1 }}
+                      value={deliveryDetails.city || ''}
+                      onChange={(e) => setDeliveryDetails({...deliveryDetails, city: e.target.value})}
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="State" 
+                      className="delivery-input"
+                      style={{ flex: 1 }}
+                      value={deliveryDetails.state || ''}
+                      onChange={(e) => setDeliveryDetails({...deliveryDetails, state: e.target.value})}
+                    />
+                  </div>
                 </div>
               </div>
 
