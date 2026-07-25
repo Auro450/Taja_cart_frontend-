@@ -1104,6 +1104,17 @@ function App() {
                       </span>
                     </div>
 
+                    {order.status === 'Picked Up' && order.eta && (
+                      <div style={{ backgroundColor: '#fef9c3', color: '#854d0e', padding: '10px 12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
+                        <Timer size={16} /> ETA: {order.eta} minutes
+                      </div>
+                    )}
+                    {order.status === 'Delivered' && order.eta && (
+                      <div style={{ backgroundColor: '#f0fdf4', color: '#166534', padding: '10px 12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
+                        <Zap size={16} color="#eab308" /> Whoosh!! the order is delivered in {order.eta} minutes
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                       {order.items.map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--primary)' }}>
