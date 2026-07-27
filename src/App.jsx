@@ -144,7 +144,7 @@ function App() {
   const [categoryList, setCategoryList] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [dismissedNotifications, setDismissedNotifications] = useLocalStorage('dismissed_notifications', []);
+  const [dismissedNotifications, setDismissedNotifications] = useLocalStorage('dismissed_notifs_v2', []);
   const [dealsOfTheDay, setDealsOfTheDay] = useState([]);
   const [activeOffers, setActiveOffers] = useState([]);
   const [isFirst20Active, setIsFirst20Active] = useState(true);
@@ -1071,7 +1071,7 @@ function App() {
             {categories.filter(c => c.name !== 'All').map((cat, idx) => (
               <div 
                 key={idx} 
-                className={`category-sidebar-item ${activeCategory === cat.name ? 'active' : ''}`}
+                className={`category-sidebar-item ${activeCategory === cat.name || (activeCategory === 'All' && cat.name === 'Vegetables') ? 'active' : ''}`}
                 onClick={() => {
                   // If clicking a category on the left, set it as active
                   // "All" is excluded, so this will always be a specific category
@@ -1089,7 +1089,7 @@ function App() {
           {/* Right Content */}
           <div className="category-content">
             <div className="product-grid">
-              {(categoryData[activeCategory === 'All' ? 'Veggies' : activeCategory] || []).map((product, idx) => (
+              {(categoryData[activeCategory === 'All' ? 'Vegetables' : activeCategory] || []).map((product, idx) => (
                 <div key={idx} className="product-card" style={{ minWidth: 'auto', width: '100%', maxWidth: '100%', margin: 0 }}>
                   <div className="product-image-container">
                     {product.image ? (
@@ -1126,7 +1126,7 @@ function App() {
                 </div>
               ))}
             </div>
-            {!(categoryData[activeCategory === 'All' ? 'Veggies' : activeCategory] || []).length && (
+            {!(categoryData[activeCategory === 'All' ? 'Vegetables' : activeCategory] || []).length && (
               <p style={{ textAlign: 'center', marginTop: '40px', color: '#64748b', fontSize: '14px' }}>No products found.</p>
             )}
           </div>
