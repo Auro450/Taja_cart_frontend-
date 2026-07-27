@@ -229,6 +229,10 @@ function Orders() {
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1' }}>
+                    <span style={{ color: '#475569', fontSize: '13px' }}>Delivery Charge</span>
+                    <span style={{ fontWeight: '600', color: '#475569', fontSize: '13px' }}>₹{order.deliveryDetails?.deliveryFee || 0}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                     <span style={{ fontWeight: '700', color: '#0f172a', fontSize: '14px' }}>Grand Total</span>
                     <span style={{ fontWeight: '800', color: 'var(--primary-green)', fontSize: '15px' }}>₹{order.grandTotal}</span>
                   </div>

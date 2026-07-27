@@ -66,15 +66,21 @@ export const generateInvoice = (order) => {
   doc.setTextColor(15, 23, 42);
   doc.text(`Total Items: ${order.items.reduce((sum, item) => sum + item.qty, 0)}`, 14, finalY);
   
+  const deliveryCharge = (order.deliveryDetails && order.deliveryDetails.deliveryFee) ? order.deliveryDetails.deliveryFee : 0;
+  
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Delivery Charge: Rs. ${deliveryCharge}`, 130, finalY);
+
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(`Grand Total: Rs. ${order.grandTotal}`, 130, finalY);
+  doc.text(`Grand Total: Rs. ${order.grandTotal}`, 130, finalY + 8);
 
   // Footer
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100, 116, 139);
-  doc.text('Thank you for shopping with Taja Cart!', 14, finalY + 20);
+  doc.text('Thank you for shopping with Taja Cart!', 14, finalY + 28);
 
   // Save the PDF
   doc.save(`Invoice_${order.id}.pdf`);

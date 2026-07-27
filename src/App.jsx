@@ -148,6 +148,8 @@ function App() {
   const [dealsOfTheDay, setDealsOfTheDay] = useState([]);
   const [activeOffers, setActiveOffers] = useState([]);
   const [isFirst20Active, setIsFirst20Active] = useState(true);
+  const [minOrderValue, setMinOrderValue] = useState(99);
+  const [deliveryChargeAmount, setDeliveryChargeAmount] = useState(10);
   const [activeAnnouncements, setActiveAnnouncements] = useState([]);
   const [featuredReviews, setFeaturedReviews] = useState([]);
   const [banners, setBanners] = useState([]);
@@ -212,6 +214,12 @@ function App() {
 
         const f20Setting = settings.find(s => s.key === 'FIRST20_ACTIVE');
         if (f20Setting) setIsFirst20Active(f20Setting.value === 'true');
+        
+        const minOrderSetting = settings.find(s => s.key === 'MIN_ORDER_FOR_FREE_DELIVERY');
+        if (minOrderSetting) setMinOrderValue(Number(minOrderSetting.value));
+        
+        const deliveryChargeSetting = settings.find(s => s.key === 'DELIVERY_CHARGE');
+        if (deliveryChargeSetting) setDeliveryChargeAmount(Number(deliveryChargeSetting.value));
         
         const newCategoryData = {};
         categories.forEach(c => {
@@ -328,7 +336,7 @@ function App() {
       date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       items: cartDetails.items,
       grandTotal: cartDetails.grandTotal,
-      deliveryDetails: { ...deliveryDetails, email: user.email }
+      deliveryDetails: { ...deliveryDetails, email: user.email, deliveryFee: cartDetails.deliveryFee }
     };
 
     try {
@@ -500,11 +508,11 @@ function App() {
     }
 
     const discountedTotal = itemTotal - discountAmount;
-    const deliveryFee = discountedTotal > 99 ? 0 : 10;
+    const deliveryFee = discountedTotal >= minOrderValue ? 0 : deliveryChargeAmount;
     const grandTotal = discountedTotal + (items.length > 0 ? deliveryFee : 0);
 
     return { items, itemTotal, discountAmount, deliveryFee, grandTotal };
-  }, [cart, appliedCoupon, categoryData, dealsOfTheDay, activeOffers]);
+  }, [cart, appliedCoupon, categoryData, dealsOfTheDay, activeOffers, minOrderValue, deliveryChargeAmount]);
 
   const allList = React.useMemo(() => {
     const allProducts = [...Object.values(categoryData).flat(), ...dealsOfTheDay];
@@ -1456,6 +1464,10 @@ function App() {
                     </div>
 
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: 'var(--gray-text)' }}>
+                        <span>Delivery Charge</span>
+                        <span style={{ fontWeight: '600', color: 'var(--primary)' }}>₹{order.deliveryDetails?.deliveryFee || 0}</span>
+                      </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '13px', color: 'var(--gray-text)' }}>{order.items.reduce((sum, item) => sum + item.qty, 0)} Items</span>
                         <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary)' }}>Total: ₹{order.grandTotal}</span>
@@ -1480,7 +1492,7 @@ function App() {
                       </div>
                       <div style={{ textAlign: 'center', marginTop: '8px' }}>
                         <a 
-                          href={`https://wa.me/+919804673546?text=${encodeURIComponent(`Hi, my name is ${user?.name || 'Customer'}. My Order id is ${order.id} containing ${order.items.map(item => `${item.name} x ${item.qty}`).join(', ')}.`)}`}
+                          href={`https://wa.me/+919239606687?text=${encodeURIComponent(`Hi, my name is ${user?.name || 'Customer'}. My Order id is ${order.id} containing ${order.items.map(item => `${item.name} x ${item.qty}`).join(', ')}.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ fontSize: '13px', color: 'var(--primary-green)', textDecoration: 'underline', fontWeight: '600' }}
@@ -1610,6 +1622,48 @@ function App() {
       )}
         </>
       )}
+
+      {/* Floating WhatsApp Button */}
+      <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '100%',
+          maxWidth: '480px',
+          pointerEvents: 'none',
+          zIndex: 999,
+      }}>
+        <a
+          href="https://wa.me/+919239606687"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: 'absolute',
+            bottom: '0',
+            right: '20px',
+            width: '56px',
+            height: '56px',
+            backgroundColor: '#25D366',
+            borderRadius: '50%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            boxShadow: '0 4px 12px rgba(37, 211, 102, 0.4)',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            transition: 'transform 0.2s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" 
+            alt="WhatsApp Support" 
+            style={{ width: '32px', height: '32px' }} 
+          />
+        </a>
+      </div>
 
       {/* Bottom Nav */}
       <div className="bottom-nav">
