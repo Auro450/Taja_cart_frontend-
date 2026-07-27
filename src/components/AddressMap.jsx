@@ -46,6 +46,10 @@ function MapFlyTo({ position }) {
 
 export default function AddressMap({ lat, lng, onChange }) {
   const [position, setPosition] = React.useState(lat && lng ? { lat, lng } : null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = React.useRef(null);
 
   useEffect(() => {
     if (lat && lng) {
@@ -56,6 +60,41 @@ export default function AddressMap({ lat, lng, onChange }) {
   const handleSetPosition = (newPos) => {
     setPosition(newPos);
     onChange(newPos.lat, newPos.lng);
+  };
+
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+      searchTimeoutRef.current = setTimeout(async () => {
+        setIsSearching(true);
+        try {
+          const restrictedQuery = query.toLowerCase().includes('west bengal') ? query : `${query}, West Bengal`;
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(restrictedQuery)}&countrycodes=in`);
+          const data = await res.json();
+          setSearchResults(data || []);
+        } catch (err) {
+        console.error("Search error:", err);
+      }
+      setIsSearching(false);
+    }, 500);
+  };
+
+  const handleSelectResult = (result) => {
+    const latNum = parseFloat(result.lat);
+    const lonNum = parseFloat(result.lon);
+    handleSetPosition({ lat: latNum, lng: lonNum });
+    setSearchQuery(result.display_name);
+    setSearchResults([]);
   };
 
   const handleGetCurrentLocation = () => {
@@ -76,6 +115,39 @@ export default function AddressMap({ lat, lng, onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+      <div style={{ position: 'relative', zIndex: 1000 }}>
+        <input 
+          type="text" 
+          placeholder="Search for a location..." 
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+        />
+        {isSearching && <div style={{ position: 'absolute', right: '12px', top: '12px', fontSize: '12px', color: '#64748b' }}>Searching...</div>}
+        
+        {searchResults.length > 0 && (
+          <ul style={{ 
+            position: 'absolute', top: '100%', left: 0, right: 0, 
+            backgroundColor: 'white', border: '1px solid #cbd5e1', 
+            borderRadius: '8px', marginTop: '4px', padding: 0, 
+            listStyle: 'none', maxHeight: '200px', overflowY: 'auto', 
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
+          }}>
+            {searchResults.map((result, idx) => (
+              <li 
+                key={idx} 
+                onClick={() => handleSelectResult(result)}
+                style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '13px', color: '#334155' }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f8fafc'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                {result.display_name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <button 
         onClick={handleGetCurrentLocation}
         type="button"

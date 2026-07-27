@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
 import AddressMap from './components/AddressMap';
@@ -26,7 +26,7 @@ function useLocalStorage(key, initialValue) {
 
   return [storedValue, setStoredValue];
 }
-import { Search, ChevronDown, User, Heart, ShoppingBag, MapPin, Grid, PlayCircle, Tag, Zap, ChevronUp, ShoppingCart, Leaf, Timer, Shield, Home, ArrowLeft, X } from 'lucide-react';
+import { Search, ChevronDown, User, Heart, ShoppingBag, MapPin, Grid, PlayCircle, Tag, Zap, ChevronUp, ShoppingCart, Leaf, Timer, Shield, Home, ArrowLeft, X, Bell } from 'lucide-react';
 
 // categoryData has been moved to the backend database
 
@@ -142,17 +142,76 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryData, setCategoryData] = useState({});
   const [categoryList, setCategoryList] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [dismissedNotifications, setDismissedNotifications] = useLocalStorage('dismissed_notifications', []);
+  const [dealsOfTheDay, setDealsOfTheDay] = useState([]);
+  const [activeOffers, setActiveOffers] = useState([]);
+  const [isFirst20Active, setIsFirst20Active] = useState(true);
+  const [activeAnnouncements, setActiveAnnouncements] = useState([]);
+  const [featuredReviews, setFeaturedReviews] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const bannerScrollRef = useRef(null);
+  
+  const [hubs, setHubs] = useState([]);
+  
+  // Saved Addresses State
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [addingNewAddress, setAddingNewAddress] = useState(false);
+  const [saveAddressLabel, setSaveAddressLabel] = useState('');
+
+  // Haversine distance formula
+  const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return R * c; 
+  };
 
   // Fetch Inventory from Backend
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const [catRes, prodRes] = await Promise.all([
+        const [catRes, prodRes, dealsRes, offersRes, settingsRes, announcementsRes, reviewsRes, bannersRes, hubRes, notifRes] = await Promise.all([
           fetch('http://localhost:3000/api/categories'),
-          fetch('http://localhost:3000/api/products')
+          fetch('http://localhost:3000/api/products'),
+          fetch('http://localhost:3000/api/deals'),
+          fetch('http://localhost:3000/api/offers'),
+          fetch('http://localhost:3000/api/settings'),
+          fetch('http://localhost:3000/api/announcements'),
+          fetch('http://localhost:3000/api/reviews/featured'),
+          fetch('http://localhost:3000/api/banners/active'),
+          fetch('http://localhost:3000/api/hubs'),
+          fetch('http://localhost:3000/api/notifications')
         ]);
         const categories = await catRes.json();
         const products = await prodRes.json();
+        const deals = await dealsRes.json();
+        const offers = await offersRes.json();
+        const settings = await settingsRes.json();
+        const announcements = await announcementsRes.json();
+        const reviews = await reviewsRes.json();
+        const activeBanners = await bannersRes.json();
+        const hubData = await hubRes.json();
+        const notificationsData = await notifRes.json();
+        
+        setDealsOfTheDay(deals);
+        setActiveOffers(offers);
+        setActiveAnnouncements(announcements);
+        setFeaturedReviews(reviews);
+        setBanners(activeBanners);
+        setHubs(hubData);
+        setNotifications(notificationsData);
+
+        const f20Setting = settings.find(s => s.key === 'FIRST20_ACTIVE');
+        if (f20Setting) setIsFirst20Active(f20Setting.value === 'true');
         
         const newCategoryData = {};
         categories.forEach(c => {
@@ -161,15 +220,43 @@ function App() {
         
         setCategoryData(newCategoryData);
         setCategoryList(categories);
-      } catch (error) {
-        console.error("Error fetching inventory:", error);
+      } catch (err) {
+        console.error('Error fetching inventory:', err);
       }
     };
     fetchInventory();
   }, []);
 
-  // Fetch Orders from Backend
+  // Auto-slide Banners Every 4 seconds
   useEffect(() => {
+    if (banners.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      if (bannerScrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = bannerScrollRef.current;
+        if (scrollLeft + clientWidth >= scrollWidth - 10) {
+          bannerScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          bannerScrollRef.current.scrollBy({ left: clientWidth, behavior: 'smooth' });
+        }
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  // Handle Search InputOrders and Addresses from Backend
+  useEffect(() => {
+    if (user && user.email) {
+      fetch(`http://localhost:3000/api/addresses/${user.email}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setSavedAddresses(data);
+        })
+        .catch(err => console.error("Error fetching addresses:", err));
+    } else {
+      setSavedAddresses([]);
+    }
+
     if (user && user.phone) {
       fetch(`http://localhost:3000/api/orders/user/${user.phone}`)
         .then(res => res.json())
@@ -190,7 +277,7 @@ function App() {
     // Flatten categoryData into a single list and remove duplicates by name
     const allUniqueProducts = [];
     const seenNames = new Set();
-    Object.values(categoryData).flat().forEach(product => {
+    [...Object.values(categoryData).flat(), ...dealsOfTheDay].forEach(product => {
       if (!seenNames.has(product.name)) {
         seenNames.add(product.name);
         allUniqueProducts.push(product);
@@ -198,7 +285,7 @@ function App() {
     });
 
     return allUniqueProducts.filter(item => item.name.toLowerCase().includes(query));
-  }, [searchQuery]);
+  }, [searchQuery, categoryData, dealsOfTheDay]);
   
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -210,6 +297,20 @@ function App() {
   // Profile State
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [editPhoneInput, setEditPhoneInput] = useState('');
+
+  const handleDeleteAddress = async (id) => {
+    if (window.confirm("Are you sure you want to delete this address?")) {
+      try {
+        const response = await fetch(`http://localhost:3000/api/addresses/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          setSavedAddresses(savedAddresses.filter(addr => addr.id !== id));
+          if (selectedAddressId === id) setSelectedAddressId(null);
+        }
+      } catch (err) {
+        console.error("Error deleting address:", err);
+      }
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!user) {
@@ -231,6 +332,34 @@ function App() {
     };
 
     try {
+      if (saveAddressLabel.trim() && user.email) {
+        const addressStr = `${deliveryDetails.building ? deliveryDetails.building + ', ' : ''}${deliveryDetails.street}, ${deliveryDetails.locality}, ${deliveryDetails.city}, ${deliveryDetails.state}`;
+        fetch('http://localhost:3000/api/addresses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: user.email,
+            label: saveAddressLabel.trim(),
+            address: addressStr,
+            landmark: deliveryDetails.landmark,
+            lat: deliveryDetails.lat,
+            lng: deliveryDetails.lng
+          })
+        }).then(res => res.json()).then(data => {
+          if (data.id) {
+            setSavedAddresses([{
+              id: data.id, 
+              userEmail: user.email, 
+              label: saveAddressLabel.trim(), 
+              address: addressStr, 
+              landmark: deliveryDetails.landmark, 
+              lat: deliveryDetails.lat, 
+              lng: deliveryDetails.lng
+            }, ...savedAddresses]);
+          }
+        }).catch(err => console.error("Error saving address:", err));
+      }
+
       const response = await fetch('http://localhost:3000/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -242,7 +371,9 @@ function App() {
         setCart({});
         setAppliedCoupon(null);
         setCouponCode('');
-        setActiveTab('orders');
+        setSaveAddressLabel('');
+        setAddingNewAddress(false);
+        setActiveTab('home');
         setPendingRatingOrder(freshOrder);
       } else {
         alert("Failed to place order.");
@@ -282,9 +413,47 @@ function App() {
   };
 
   const handleApplyCoupon = () => {
-    if (couponCode === 'FIRST20' || couponCode === 'FLAT20') {
+    if (couponCode === 'FIRST20') {
+      if (!isFirst20Active) {
+        setCouponError('This coupon is currently inactive');
+        setAppliedCoupon(null);
+        return;
+      }
+      if (!user) {
+        setCouponError('Please login to apply this coupon');
+        setAppliedCoupon(null);
+        return;
+      }
+      const userOrderCount = placedOrders.filter(o => o.deliveryDetails && o.deliveryDetails.phone === user.phone).length;
+      if (userOrderCount >= 2) {
+        setCouponError('FIRST20 is only valid for your first 2 orders');
+        setAppliedCoupon(null);
+        return;
+      }
       setAppliedCoupon(couponCode);
       setCouponError('');
+      return;
+    } 
+    
+    if (couponCode === 'FLAT20') {
+      setAppliedCoupon(couponCode);
+      setCouponError('');
+      return;
+    }
+
+    const dynamicOffer = activeOffers.find(o => o.code === couponCode);
+    if (dynamicOffer) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const validUntil = new Date(dynamicOffer.valid_until);
+      
+      if (today > validUntil) {
+        setCouponError('This coupon has expired');
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon(couponCode);
+        setCouponError('');
+      }
     } else {
       setCouponError('Invalid coupon code');
       setAppliedCoupon(null);
@@ -308,7 +477,7 @@ function App() {
   const totalCartItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
 
   const cartDetails = React.useMemo(() => {
-    const allProducts = Object.values(categoryData).flat();
+    const allProducts = [...Object.values(categoryData).flat(), ...dealsOfTheDay];
     const items = [];
     let itemTotal = 0;
 
@@ -323,6 +492,11 @@ function App() {
     let discountAmount = 0;
     if (appliedCoupon === 'FIRST20' || appliedCoupon === 'FLAT20') {
       discountAmount = Math.floor(itemTotal * 0.2); // 20% off
+    } else if (appliedCoupon) {
+      const dynamicOffer = activeOffers.find(o => o.code === appliedCoupon);
+      if (dynamicOffer) {
+        discountAmount = Math.floor(itemTotal * (dynamicOffer.discount_percent / 100));
+      }
     }
 
     const discountedTotal = itemTotal - discountAmount;
@@ -330,17 +504,22 @@ function App() {
     const grandTotal = discountedTotal + (items.length > 0 ? deliveryFee : 0);
 
     return { items, itemTotal, discountAmount, deliveryFee, grandTotal };
-  }, [cart, appliedCoupon]);
+  }, [cart, appliedCoupon, categoryData, dealsOfTheDay, activeOffers]);
 
   const allList = React.useMemo(() => {
-    const allProducts = Object.values(categoryData).flat();
-    return allProducts.sort(() => 0.5 - Math.random());
-  }, [categoryData]);
+    const allProducts = [...Object.values(categoryData).flat(), ...dealsOfTheDay];
+    // Remove duplicates by name
+    const unique = [];
+    const seen = new Set();
+    allProducts.forEach(p => {
+      if(!seen.has(p.name)) {
+        seen.add(p.name);
+        unique.push(p);
+      }
+    });
+    return unique.sort(() => 0.5 - Math.random());
+  }, [categoryData, dealsOfTheDay]);
 
-  const dealsOfTheDay = React.useMemo(() => {
-    const allProducts = Object.values(categoryData).flat();
-    return allProducts.sort(() => 0.5 - Math.random()).slice(0, 10);
-  }, [categoryData]);
 
   const categories = [
     { name: 'All', iconUrl: '/category-icons/all.png' },
@@ -417,6 +596,11 @@ function App() {
 
   const userOrders = user ? placedOrders.filter(o => o.deliveryDetails && o.deliveryDetails.phone === user.phone) : [];
 
+  const activeHubs = hubs ? hubs.filter(h => h.is_active) : [];
+  const isOutOfRange = activeHubs.length > 0 && deliveryDetails.lat && deliveryDetails.lng 
+    ? !activeHubs.some(hub => getDistanceFromLatLonInKm(deliveryDetails.lat, deliveryDetails.lng, hub.lat, hub.lng) <= hub.radius_km)
+    : false;
+
   return (
     <div className="app-container">
       
@@ -478,14 +662,101 @@ function App() {
                 </svg>
               </div>
               <div className="flex items-center justify-end pr-1 mt-1">
-                <span style={{ fontSize: '11px' }}>🥦</span>
+                <span style={{ fontSize: '11px' }}>🍋</span>
                 <span style={{ color: '#1a1a1a', fontWeight: 700, fontSize: '11px', margin: '0 3px' }}>Freshness Delivered Daily</span>
-                <span style={{ fontSize: '11px' }}>🥕</span>
+                <span style={{ fontSize: '11px' }}>🥭 </span>
               </div>
             </div>
           </div>
-          <div className="profile-icon" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setActiveTab('cart')}>
-            <ShoppingCart size={20} className="text-gray" />
+          <div className="flex items-center gap-4">
+            <div className="profile-icon" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setIsNotificationOpen(!isNotificationOpen)}>
+              <Bell size={24} color="#084c20" />
+              {notifications.filter(n => !dismissedNotifications.includes(n.id)).length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -6,
+                  right: -6,
+                  backgroundColor: '#e53935',
+                  color: 'white',
+                  fontSize: 10,
+                  fontWeight: 'bold',
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}>
+                  {notifications.filter(n => !dismissedNotifications.includes(n.id)).length}
+                </span>
+              )}
+              {isNotificationOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: -10,
+                  marginTop: '16px',
+                  width: '320px',
+                  backgroundColor: 'white',
+                  borderRadius: '16px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                  zIndex: 2000,
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  border: '1px solid #eee'
+                }}>
+                  <div style={{ padding: '16px', borderBottom: '1px solid #eee', fontWeight: 'bold', color: '#084c20', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Notifications</span>
+                    <button onClick={(e) => { e.stopPropagation(); setIsNotificationOpen(false); }} style={{ color: '#999' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {notifications.filter(n => !dismissedNotifications.includes(n.id)).length === 0 ? (
+                    <div style={{ padding: '32px 16px', textAlign: 'center', color: '#666' }}>
+                      <Bell size={32} color="#ddd" style={{ margin: '0 auto 12px' }} />
+                      <p>You have no new notifications.</p>
+                    </div>
+                  ) : (
+                    notifications.filter(n => !dismissedNotifications.includes(n.id)).map(notif => (
+                      <div key={notif.id} style={{ 
+                        padding: '16px', 
+                        borderBottom: '1px solid #f5f5f5', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'flex-start', 
+                        gap: '12px',
+                        backgroundColor: '#fafafa'
+                      }}>
+                        <p style={{ margin: 0, fontSize: '14px', color: '#333', lineHeight: '1.4' }}>{notif.text}</p>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDismissedNotifications([...dismissedNotifications, notif.id]);
+                          }}
+                          style={{ 
+                            cursor: 'pointer', 
+                            flexShrink: 0,
+                            padding: '4px',
+                            background: '#eee',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#666'
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="profile-icon" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setActiveTab('cart')}>
+              <ShoppingCart size={24} color="#084c20" />
             {totalCartItems > 0 && (
               <span style={{
                 position: 'absolute',
@@ -505,6 +776,7 @@ function App() {
                 {totalCartItems}
               </span>
             )}
+          </div>
           </div>
         </div>
 
@@ -589,14 +861,15 @@ function App() {
           {activeTab === 'home' && (
         <>
           {/* Announcement Bar */}
-      <div className="announcement-bar">
-        <div className="marquee-content">
-          <span className="marquee-item">🎉 Free delivery above Rs 99/-</span>
-          <span className="marquee-item">⚡️ Rs 10/- delivery charge below Rs 99/-</span>
-          <span className="marquee-item">🎉 Free delivery above Rs 99/-</span>
-          <span className="marquee-item">⚡️ Rs 10/- delivery charge below Rs 99/-</span>
+      {activeAnnouncements.length > 0 && (
+        <div className="announcement-bar">
+          <div className="marquee-content">
+            {[...activeAnnouncements, ...activeAnnouncements].map((ann, idx) => (
+              <span key={idx} className="marquee-item">{ann.text}</span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Nav Categories */}
       <div className="nav-categories">
@@ -661,167 +934,123 @@ function App() {
         </div>
       )}
 
-      {/* Promo Banners */}
-      <div className="banner-section mb-4">
-        <div className="banner-scroll-container">
-          
-          {/* Banner 1 */}
-          <div className="banner flex items-center" style={{ 
-            background: 'linear-gradient(90deg, #0f823a 50%, rgba(15, 130, 58, 0) 100%), url("https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80")', 
-            backgroundSize: 'cover', 
-            backgroundPosition: 'right center' 
-          }}>
-            <div style={{ width: '70%', zIndex: 2 }}>
-              <h2 style={{ fontSize: 26, fontStyle: 'italic', fontWeight: 900, letterSpacing: '-0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>FARM FRESH</h2>
-              <p className="mb-3" style={{ fontWeight: 600, fontSize: 13, opacity: 0.95, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>DELIVERED TO YOU</p>
-              <button onClick={() => setActiveTab('category')} style={{ backgroundColor: 'white', color: '#0f823a', padding: '8px 20px', borderRadius: '24px', fontWeight: '800', fontSize: '13px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>Order Now</button>
-            </div>
-          </div>
-
-          {/* Banner 2 */}
-          <div className="banner flex items-center relative overflow-hidden" style={{ 
-            backgroundColor: '#388e3c'
-          }}>
-             <img src="/user-scooter-transparent.png" alt="Delivery Scooter" style={{ position: 'absolute', right: '-5%', bottom: '-5%', height: '110%', zIndex: 1, objectFit: 'contain', transform: 'scaleX(-1)' }} />
-             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(90deg, #388e3c 55%, rgba(56, 142, 60, 0.8) 75%, rgba(56, 142, 60, 0) 100%)', zIndex: 2 }}></div>
-             <div style={{ width: '75%', zIndex: 3, position: 'relative' }}>
-               <h2 style={{ fontSize: 24, fontStyle: 'italic', fontWeight: 900, letterSpacing: '-0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>FREE & FAST</h2>
-               <p className="mb-2" style={{ fontWeight: 600, fontSize: 13, opacity: 0.95, textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>SUPERFAST DELIVERY</p>
-               <div className="flex gap-2 text-xs">
-                 <span className="flex items-center gap-1 font-bold" style={{textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}><span className="bg-white rounded-full p-1 flex items-center justify-center shadow-md" style={{color: '#388e3c', width: 14, height: 14, textShadow: 'none'}}>✓</span> ₹0 Handling</span>
-                 <span className="flex items-center gap-1 font-bold" style={{textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}><span className="bg-white rounded-full p-1 flex items-center justify-center shadow-md" style={{color: '#388e3c', width: 14, height: 14, textShadow: 'none'}}>✓</span> ₹0 Fees</span>
-               </div>
-             </div>
-          </div>
-
-          {/* Banner 3 */}
-          <div className="banner flex items-center" style={{ 
-            background: 'linear-gradient(90deg, #1b5e20 55%, rgba(27, 94, 32, 0) 100%), url("https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=800&q=80")',
-            backgroundSize: 'cover', 
-            backgroundPosition: 'right center'
-          }}>
-            <div style={{ width: '70%', zIndex: 2 }}>
-              <h2 style={{ fontSize: 24, fontStyle: 'italic', fontWeight: 900, letterSpacing: '-0.5px', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>100% TRUSTED</h2>
-              <p className="mb-2" style={{ fontWeight: 600, fontSize: 13, opacity: 0.95, textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>SERVICE GUARANTEED</p>
-              <div className="flex gap-2 text-xs">
-                 <span className="flex items-center gap-1 font-bold" style={{textShadow: '0 1px 2px rgba(0,0,0,0.2)'}}><span className="bg-white rounded-full p-1 flex items-center justify-center shadow-md" style={{color: '#1b5e20', width: 14, height: 14, textShadow: 'none'}}>★</span> Top Rated App</span>
-               </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
       {/* Deals of the Day */}
       <div className="section mt-2" style={{ padding: '16px 0', backgroundColor: 'var(--white)' }}>
-        <div style={{ padding: '0 16px', marginBottom: '12px', textAlign: 'center' }}>
+        <div style={{ padding: '0 16px', marginBottom: '12px' }}>
           <h3 style={{ 
             fontSize: '18px', 
             fontWeight: '700', 
             color: 'var(--primary)', 
-            margin: 0
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            Deals of the Day
+            ⚡ Deals of the Day
           </h3>
         </div>
-        <div className="product-scroll-container">
-          {dealsOfTheDay.map((product, idx) => (
-            <div key={idx} className="product-card">
-              <div className="product-image-container">
-                {product.image ? (
-                  <img src={product.image?.startsWith('/uploads') ? `http://localhost:3000${product.image}` : product.image} alt={product.name} className="product-image" />
-                ) : (
-                  <span style={{ fontSize: '48px' }}>{product.emoji}</span>
-                )}
-                {cart[product.name] ? (
-                  <div className="quantity-control">
-                    <button className="qty-btn" onClick={() => updateCart(product.name, -1)}>-</button>
-                    <span className="qty-text">{cart[product.name]}</span>
-                    <button className="qty-btn" onClick={() => updateCart(product.name, 1)}>+</button>
-                  </div>
-                ) : (
-                  <button className="add-btn" onClick={() => updateCart(product.name, 1)}>
-                    <span className="plus-sign">+</span>
-                  </button>
-                )}
-              </div>
-              <div className="product-details">
-                <div className="price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span className="current-price">₹{product.currentPrice}</span>
-                    <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹200</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px' }}>
-                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 'bold' }}>{(4 + (product.name.charCodeAt(0) % 10) / 10).toFixed(1)}</span>
-                    <span style={{ fontSize: '10px' }}>⭐</span>
-                  </div>
+        
+        {dealsOfTheDay.length === 0 ? (
+          <p style={{ padding: '0 16px', color: 'var(--gray-text)', fontSize: '14px' }}>No deals available today.</p>
+        ) : (
+          <div className="product-scroll-container">
+            {dealsOfTheDay.map((product, idx) => (
+              <div key={idx} className="product-card">
+                <div className="product-image-container">
+                  {product.image ? (
+                    <img src={product.image?.startsWith('/uploads') ? `http://localhost:3000${product.image}` : product.image} alt={product.name} className="product-image" />
+                  ) : (
+                    <span style={{ fontSize: '48px' }}>{product.emoji}</span>
+                  )}
+                  {cart[product.name] ? (
+                    <div className="quantity-control">
+                      <button className="qty-btn" onClick={() => updateCart(product.name, -1)}>-</button>
+                      <span className="qty-text">{cart[product.name]}</span>
+                      <button className="qty-btn" onClick={() => updateCart(product.name, 1)}>+</button>
+                    </div>
+                  ) : (
+                    <button className="add-btn" onClick={() => updateCart(product.name, 1)}>
+                      <span className="plus-sign">+</span>
+                    </button>
+                  )}
                 </div>
-                <h3 className="product-name">{product.name}</h3>
-                <p className="product-quantity">{product.quantity}</p>
+                <div className="product-details">
+                  <div className="price-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="current-price">₹{product.currentPrice}</span>
+                      <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹{product.cutPrice}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 'bold' }}>{product.rating}</span>
+                      <span style={{ fontSize: '10px' }}>⭐</span>
+                    </div>
+                  </div>
+                  <h3 className="product-name">{product.name}</h3>
+                  <p className="product-quantity">{product.quantity}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Promo Banner */}
-      <div className="section mt-2" style={{ padding: '0 16px', marginBottom: '16px' }}>
-        <div style={{
-          position: 'relative',
-          background: 'linear-gradient(90deg, #11823b 0%, #16a34a 100%)',
-          borderRadius: '16px',
-          padding: '24px 16px',
-          color: '#fff',
-          overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-        }}>
-          <div style={{ position: 'relative', zIndex: 2, width: '70%' }}>
-            <div style={{ 
-              display: 'inline-block', 
-              backgroundColor: '#ffd32a', 
-              color: '#11823b', 
-              fontSize: '11px', 
-              fontWeight: '800', 
-              padding: '4px 8px', 
-              borderRadius: '4px',
-              marginBottom: '8px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              App Exclusive
-            </div>
-            <h2 style={{ fontSize: '22px', fontStyle: 'italic', fontWeight: '900', lineHeight: '1.2', marginBottom: '8px', textShadow: '0 2px 4px rgba(0,0,0,0.3)', letterSpacing: '-0.5px' }}>
-              FLAT <span style={{ color: '#ffd32a' }}>20% OFF</span>
-            </h2>
-            <p style={{ fontSize: '13px', opacity: 0.95, marginBottom: '16px', lineHeight: '1.4', fontWeight: '600', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
-              on your 1st order through app
-            </p>
-            
-            <div style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              background: 'rgba(255,255,255,0.25)', 
-              border: '1px dashed rgba(255,255,255,0.7)', 
-              padding: '6px 12px', 
-              borderRadius: '8px',
-              gap: '6px',
-              backdropFilter: 'blur(2px)'
-            }}>
-              <span style={{ fontSize: '11px', opacity: 0.9, fontWeight: '600', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>Use code:</span>
-              <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>FIRST20</span>
-            </div>
+      {/* Dynamic Banners */}
+      {banners.length > 0 && (
+        <div className="banner-section mb-4" style={{ marginTop: '16px', marginLeft: '16px', marginRight: '16px', overflow: 'hidden', borderRadius: '16px' }}>
+          <div className="banner-scroll-container" ref={bannerScrollRef} style={{ display: 'flex', overflowX: 'auto', scrollBehavior: 'smooth', snapType: 'x mandatory', gap: '16px', padding: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {banners.map((banner, idx) => (
+              <img 
+                key={idx} 
+                src={`http://localhost:3000${banner.image}`} 
+                alt="Promo Banner" 
+                style={{ 
+                  flex: '0 0 100%',
+                  width: '100%',
+                  height: '160px',
+                  objectFit: 'fill',
+                  borderRadius: '16px',
+                  scrollSnapAlign: 'start',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }} 
+              />
+            ))}
           </div>
-          <img src="/cart_filled_transparent.png" alt="Grocery Cart" style={{
-            position: 'absolute',
-            right: '0',
-            bottom: '5%',
-            height: '95%',
-            objectFit: 'contain',
-            zIndex: 1,
-            filter: 'drop-shadow(0 8px 12px rgba(0,0,0,0.3))'
-          }} />
         </div>
-      </div>
+      )}
+      
+      {/* Featured Reviews */}
+      {featuredReviews.length > 0 && (
+        <div className="section mt-2" style={{ padding: '16px 0', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ padding: '0 16px', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary-dark)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⭐ Happy Customers
+            </h3>
+          </div>
+          <div style={{ display: 'flex', overflowX: 'auto', gap: '16px', padding: '4px 16px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {featuredReviews.map((rev, idx) => (
+              <div key={idx} style={{ 
+                flex: '0 0 280px', 
+                backgroundColor: 'var(--white)', 
+                borderRadius: '12px', 
+                padding: '16px', 
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#1e293b' }}>{rev.customer_name}</h4>
+                  <div style={{ display: 'flex', color: '#eab308', fontSize: '14px' }}>
+                    {'★'.repeat(rev.rating)}{'☆'.repeat(5 - rev.rating)}
+                  </div>
+                </div>
+                <p style={{ margin: 0, fontSize: '14px', color: '#475569', fontStyle: 'italic', lineHeight: '1.4' }}>
+                  "{rev.text}"
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ height: '20px' }}></div>
       </>
       )}
@@ -963,71 +1192,168 @@ function App() {
 
               {/* Delivery Details */}
               <div className="delivery-details-section" style={{ backgroundColor: 'var(--white)', padding: '16px', borderRadius: '12px', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary)', margin: '0 0 16px 0' }}>Delivery Details</h3>
-                <AddressMap lat={deliveryDetails.lat} lng={deliveryDetails.lng} onChange={(lat, lng) => setDeliveryDetails({...deliveryDetails, lat, lng})} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Receiver's Name" 
-                    className="delivery-input"
-                    value={deliveryDetails.name}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, name: e.target.value})}
-                  />
-                  <input 
-                    type="tel" 
-                    placeholder="10 digit mobile number" 
-                    className="delivery-input"
-                    value={deliveryDetails.phone}
-                    maxLength={10}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Street Name" 
-                    className="delivery-input"
-                    value={deliveryDetails.street || ''}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, street: e.target.value})}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Building Name / House No" 
-                    className="delivery-input"
-                    value={deliveryDetails.building || ''}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, building: e.target.value})}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Locality / Area" 
-                    className="delivery-input"
-                    value={deliveryDetails.locality || ''}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, locality: e.target.value})}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Landmark (Optional)" 
-                    className="delivery-input"
-                    value={deliveryDetails.landmark || ''}
-                    onChange={(e) => setDeliveryDetails({...deliveryDetails, landmark: e.target.value})}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input 
-                      type="text" 
-                      placeholder="City" 
-                      className="delivery-input"
-                      style={{ flex: 1 }}
-                      value={deliveryDetails.city || ''}
-                      onChange={(e) => setDeliveryDetails({...deliveryDetails, city: e.target.value})}
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="State" 
-                      className="delivery-input"
-                      style={{ flex: 1 }}
-                      value={deliveryDetails.state || ''}
-                      onChange={(e) => setDeliveryDetails({...deliveryDetails, state: e.target.value})}
-                    />
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>Delivery Details</h3>
+                  {(savedAddresses.length > 0 && addingNewAddress) && (
+                    <button onClick={() => setAddingNewAddress(false)} style={{ fontSize: '13px', color: 'var(--primary-green)', fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  )}
                 </div>
+
+                {savedAddresses.length > 0 && !addingNewAddress ? (
+                  <div>
+                    {savedAddresses.map(addr => (
+                      <div 
+                        key={addr.id}
+                        onClick={() => {
+                          setSelectedAddressId(addr.id);
+                          setDeliveryDetails({
+                            ...deliveryDetails,
+                            street: addr.address.split(',')[0] ? addr.address.split(',')[0].trim() : '',
+                            locality: addr.address.split(',')[1] ? addr.address.split(',')[1].trim() : '',
+                            city: addr.address.split(',')[2] ? addr.address.split(',')[2].trim() : '',
+                            state: addr.address.split(',')[3] ? addr.address.split(',')[3].trim() : '',
+                            landmark: addr.landmark || '',
+                            lat: addr.lat,
+                            lng: addr.lng
+                          });
+                        }}
+                        style={{
+                          padding: '12px',
+                          border: selectedAddressId === addr.id ? '2px solid var(--primary-green)' : '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          marginBottom: '12px',
+                          cursor: 'pointer',
+                          backgroundColor: selectedAddressId === addr.id ? '#f0fdf4' : 'white',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#e2e8f0', padding: '2px 8px', borderRadius: '12px', color: '#475569' }}>
+                            {addr.label}
+                          </span>
+                        </div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#334155', fontWeight: '500' }}>{addr.address}</p>
+                        {addr.landmark && <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Landmark: {addr.landmark}</p>}
+                        
+                        {selectedAddressId === addr.id && (
+                          <div style={{ position: 'absolute', top: '12px', right: '12px', color: 'var(--primary-green)' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    <button 
+                      onClick={() => {
+                        setSelectedAddressId(null);
+                        setAddingNewAddress(true);
+                        setDeliveryDetails({ ...deliveryDetails, street: '', building: '', locality: '', landmark: '', city: '', state: '', lat: null, lng: null });
+                      }} 
+                      style={{ width: '100%', padding: '12px', border: '1px dashed var(--primary-green)', borderRadius: '8px', backgroundColor: 'transparent', color: 'var(--primary-green)', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                    >
+                      <span style={{ fontSize: '18px' }}>+</span> Add New Address
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <AddressMap lat={deliveryDetails.lat} lng={deliveryDetails.lng} onChange={(lat, lng) => setDeliveryDetails({...deliveryDetails, lat, lng})} />
+                    {isOutOfRange && (
+                      <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '12px', borderRadius: '8px', marginTop: '12px', fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>
+                        We are not currently available in this location.
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Receiver's Name" 
+                        className="delivery-input"
+                        value={deliveryDetails.name}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, name: e.target.value})}
+                      />
+                      <input 
+                        type="tel" 
+                        placeholder="10 digit mobile number" 
+                        className="delivery-input"
+                        value={deliveryDetails.phone}
+                        maxLength={10}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Street Name" 
+                        className="delivery-input"
+                        value={deliveryDetails.street || ''}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, street: e.target.value})}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Building Name / House No" 
+                        className="delivery-input"
+                        value={deliveryDetails.building || ''}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, building: e.target.value})}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Locality / Area" 
+                        className="delivery-input"
+                        value={deliveryDetails.locality || ''}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, locality: e.target.value})}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Landmark (Optional)" 
+                        className="delivery-input"
+                        value={deliveryDetails.landmark || ''}
+                        onChange={(e) => setDeliveryDetails({...deliveryDetails, landmark: e.target.value})}
+                      />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="City" 
+                          className="delivery-input"
+                          style={{ flex: 1 }}
+                          value={deliveryDetails.city || ''}
+                          onChange={(e) => setDeliveryDetails({...deliveryDetails, city: e.target.value})}
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="State" 
+                          className="delivery-input"
+                          style={{ flex: 1 }}
+                          value={deliveryDetails.state || ''}
+                          onChange={(e) => setDeliveryDetails({...deliveryDetails, state: e.target.value})}
+                        />
+                      </div>
+                      
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 'bold', color: '#334155' }}>Save this address as (Optional)</p>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {['Home', 'Work', 'Other'].map(label => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => setSaveAddressLabel(label)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                border: saveAddressLabel === label ? '1px solid var(--primary-green)' : '1px solid #cbd5e1',
+                                backgroundColor: saveAddressLabel === label ? '#dcfce7' : 'white',
+                                color: saveAddressLabel === label ? 'var(--primary-green)' : '#64748b'
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Bill Details */}
@@ -1054,7 +1380,12 @@ function App() {
               </div>
 
               {/* Place Order CTA */}
-              <button className="place-order-btn" onClick={handlePlaceOrder}>
+              <button 
+                className="place-order-btn" 
+                onClick={handlePlaceOrder}
+                disabled={isOutOfRange}
+                style={isOutOfRange ? { backgroundColor: '#94a3b8', cursor: 'not-allowed' } : {}}
+              >
                 <span>Place Order</span>
                 <span>₹{cartDetails.grandTotal}</span>
               </button>
@@ -1147,6 +1478,16 @@ function App() {
                           </button>
                         )}
                       </div>
+                      <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                        <a 
+                          href={`https://wa.me/+919804673546?text=${encodeURIComponent(`Hi, my name is ${user?.name || 'Customer'}. My Order id is ${order.id} containing ${order.items.map(item => `${item.name} x ${item.qty}`).join(', ')}.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '13px', color: 'var(--primary-green)', textDecoration: 'underline', fontWeight: '600' }}
+                        >
+                          Need help with this order?
+                        </a>
+                      </div>
                       <OrderRatingWidget order={order} onReviewSubmitted={handleReviewSubmitted} />
                     </div>
                   </div>
@@ -1165,57 +1506,92 @@ function App() {
           </div>
           <div style={{ padding: '16px' }}>
             {user ? (
-              <div style={{ backgroundColor: 'var(--white)', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'var(--light-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-green)', overflow: 'hidden' }}>
-                    {user.picture ? <img src={user.picture} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={32} />}
+              <>
+                <div style={{ backgroundColor: 'var(--white)', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'var(--light-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-green)', overflow: 'hidden' }}>
+                      {user.picture ? <img src={user.picture} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={32} />}
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary)' }}>{user.name}</h3>
+                      <p style={{ margin: '4px 0 0 0', color: 'var(--gray-text)', fontSize: '14px' }}>{user.email}</p>
+                      
+                      {isEditingPhone ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                          <span style={{ fontSize: '14px', color: 'var(--gray-text)' }}>+91</span>
+                          <input 
+                            type="tel" 
+                            value={editPhoneInput}
+                            onChange={(e) => setEditPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            maxLength={10}
+                            style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '4px 8px', fontSize: '14px', width: '120px' }}
+                            autoFocus
+                          />
+                          <button onClick={handleUpdatePhone} style={{ background: 'var(--primary-green)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Save</button>
+                          <button onClick={() => setIsEditingPhone(false)} style={{ background: '#f1f5f9', color: 'var(--gray-text)', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                          <p style={{ margin: 0, color: 'var(--gray-text)', fontSize: '14px' }}>+91 {user.phone}</p>
+                          <button 
+                            onClick={() => {
+                              setEditPhoneInput(user.phone || '');
+                              setIsEditingPhone(true);
+                            }}
+                            style={{ background: 'none', border: 'none', color: 'var(--primary-green)', fontSize: '12px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary)' }}>{user.name}</h3>
-                    <p style={{ margin: '4px 0 0 0', color: 'var(--gray-text)', fontSize: '14px' }}>{user.email}</p>
-                    
-                    {isEditingPhone ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '14px', color: 'var(--gray-text)' }}>+91</span>
-                        <input 
-                          type="tel" 
-                          value={editPhoneInput}
-                          onChange={(e) => setEditPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          maxLength={10}
-                          style={{ border: '1px solid #e2e8f0', borderRadius: '4px', padding: '4px 8px', fontSize: '14px', width: '120px' }}
-                          autoFocus
-                        />
-                        <button onClick={handleUpdatePhone} style={{ background: 'var(--primary-green)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Save</button>
-                        <button onClick={() => setIsEditingPhone(false)} style={{ background: '#f1f5f9', color: 'var(--gray-text)', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                        <p style={{ margin: 0, color: 'var(--gray-text)', fontSize: '14px' }}>+91 {user.phone}</p>
-                        <button 
-                          onClick={() => {
-                            setEditPhoneInput(user.phone || '');
-                            setIsEditingPhone(true);
-                          }}
-                          style={{ background: 'none', border: 'none', color: 'var(--primary-green)', fontSize: '12px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    )}
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                    <button 
+                      onClick={() => {
+                        setUser(null);
+                        setActiveTab('home');
+                      }}
+                      style={{ width: '100%', padding: '12px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '15px', cursor: 'pointer' }}
+                    >
+                      Log Out
+                    </button>
                   </div>
                 </div>
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                  <button 
-                    onClick={() => {
-                      setUser(null);
-                      setActiveTab('home');
-                    }}
-                    style={{ width: '100%', padding: '12px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '15px', cursor: 'pointer' }}
-                  >
-                    Log Out
-                  </button>
+                
+                {/* Address Book Section */}
+                <div style={{ marginTop: '24px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary)', marginBottom: '16px' }}>Address Book</h3>
+                  {savedAddresses.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {savedAddresses.map(addr => (
+                        <div key={addr.id} style={{ backgroundColor: 'var(--white)', padding: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '12px', color: '#475569' }}>
+                                {addr.label}
+                              </span>
+                            </div>
+                            <p style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#334155', fontWeight: '500' }}>{addr.address}</p>
+                            {addr.landmark && <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Landmark: {addr.landmark}</p>}
+                          </div>
+                          <button 
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ backgroundColor: 'var(--white)', padding: '24px', borderRadius: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <MapPin size={32} style={{ opacity: 0.5, marginBottom: '12px' }} />
+                      <p style={{ margin: 0, fontSize: '14px' }}>No saved addresses yet.</p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </>
             ) : (
               <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' }}>
                 <User size={64} color="#cbd5e1" style={{ marginBottom: '16px' }} />

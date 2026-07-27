@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 function Store() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
+  const [deals, setDeals] = useState([]);
+
   
   const [activeCategory, setActiveCategory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -10,10 +12,12 @@ function Store() {
   // Modals
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [editingDeal, setEditingDeal] = useState(null);
 
   useEffect(() => {
     fetchCategories();
     fetchProducts();
+    fetchDeals();
   }, []);
 
   const fetchCategories = async () => {
@@ -28,6 +32,12 @@ function Store() {
     const data = await res.json();
     setProducts(data);
     setLoading(false);
+  };
+
+  const fetchDeals = async () => {
+    const res = await fetch('http://localhost:3000/api/deals');
+    const data = await res.json();
+    setDeals(data);
   };
 
   const handleSaveCategory = async (e) => {
@@ -87,6 +97,37 @@ function Store() {
     }
   };
 
+  const handleSaveDeal = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+
+    if (editingDeal.id) {
+      await fetch(`http://localhost:3000/api/deals/${editingDeal.id}`, {
+        method: 'PUT',
+        body: formData
+      });
+    } else {
+      const res = await fetch(`http://localhost:3000/api/deals`, {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        alert(errData.error || "Failed to add deal");
+        return;
+      }
+    }
+    setEditingDeal(null);
+    fetchDeals();
+  };
+
+  const handleDeleteDeal = async (id) => {
+    if (window.confirm("Delete this deal?")) {
+      await fetch(`http://localhost:3000/api/deals/${id}`, { method: 'DELETE' });
+      fetchDeals();
+    }
+  };
+
   const currentProducts = products.filter(p => p.category_id === activeCategory);
 
   if (loading) return <div>Loading store data...</div>;
@@ -105,6 +146,15 @@ function Store() {
             <h3 style={{ margin: 0 }}>Categories</h3>
             <button onClick={() => setEditingCategory({})} style={{ backgroundColor: '#f1f5f9', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>+ Add</button>
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+            <div 
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', backgroundColor: activeCategory === 'deals' ? '#fef9c3' : '#fefce8', border: activeCategory === 'deals' ? '1px solid #fde047' : '1px solid transparent' }}
+              onClick={() => setActiveCategory('deals')}
+            >
+              <span style={{ fontWeight: activeCategory === 'deals' ? 'bold' : 'normal', color: '#854d0e' }}>⚡ Deals of the Day</span>
+              <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 'bold' }}>{deals.length}/10</span>
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {categories.map(c => (
               <div 
@@ -122,9 +172,55 @@ function Store() {
           </div>
         </div>
 
-        {/* Main: Products */}
+        {/* Main: Products / Deals */}
         <div style={{ flex: 1, backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          {activeCategory ? (
+          {activeCategory === 'deals' ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Deals of the Day</h3>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Maximum 10 deals can be active.</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    if (deals.length >= 10) return alert("Maximum 10 deals reached.");
+                    setEditingDeal({ name: '', quantity: '', currentPrice: '', cutPrice: '', rating: 4.5, image: '' });
+                  }}
+                  disabled={deals.length >= 10}
+                  style={{ backgroundColor: deals.length >= 10 ? '#cbd5e1' : '#eab308', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: deals.length >= 10 ? 'not-allowed' : 'pointer' }}
+                >
+                  + Add Deal
+                </button>
+              </div>
+
+              {deals.length === 0 ? (
+                <p style={{ color: '#64748b' }}>No deals of the day added yet.</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                  {deals.map(p => (
+                    <div key={p.id} style={{ border: '1px solid #fde047', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', backgroundColor: '#fefce8' }}>
+                      <img src={p.image?.startsWith('/uploads') ? `http://localhost:3000${p.image}` : p.image} alt={p.name} style={{ width: '100%', height: '100px', objectFit: 'contain', marginBottom: '12px' }} />
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#854d0e' }}>{p.name}</h4>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#a16207' }}>{p.quantity}</p>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div>
+                          <span style={{ fontWeight: 'bold', color: '#0f172a', marginRight: '6px' }}>₹{p.currentPrice}</span>
+                          <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px' }}>₹{p.cutPrice}</span>
+                        </div>
+                        <span style={{ backgroundColor: '#fef08a', color: '#854d0e', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>★ {p.rating}</span>
+                      </div>
+                      
+                      <div style={{ marginTop: 'auto', display: 'flex', gap: '8px' }}>
+                        <button onClick={() => setEditingDeal(p)} style={{ flex: 1, padding: '6px', backgroundColor: 'white', border: '1px solid #fde047', color: '#854d0e', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
+                        <button onClick={() => handleDeleteDeal(p.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#fef08a', color: '#b45309', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : activeCategory ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h3 style={{ margin: 0 }}>Products in Category</h3>
@@ -224,6 +320,49 @@ function Store() {
               <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                 <button type="button" onClick={() => setEditingProduct(null)} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ flex: 1, padding: '10px', backgroundColor: 'var(--primary-green)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save Product</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Deal Modal */}
+      {editingDeal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#fefce8', padding: '24px', borderRadius: '12px', width: '400px', maxHeight: '90vh', overflowY: 'auto', border: '2px solid #fde047' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#854d0e' }}>{editingDeal.id ? 'Edit Deal of the Day' : 'New Deal of the Day'}</h3>
+            <form onSubmit={handleSaveDeal} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#a16207' }}>Name</label>
+                <input name="name" defaultValue={editingDeal.name} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} required />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#a16207' }}>Quantity (e.g. '1 kg')</label>
+                <input name="quantity" defaultValue={editingDeal.quantity} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} required />
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '12px', color: '#a16207' }}>Current Price (₹)</label>
+                  <input name="currentPrice" type="number" step="0.01" defaultValue={editingDeal.currentPrice} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '12px', color: '#a16207' }}>Cut Price (₹)</label>
+                  <input name="cutPrice" type="number" step="0.01" defaultValue={editingDeal.cutPrice} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} required />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#a16207' }}>Rating (e.g. 4.5)</label>
+                <input name="rating" type="number" step="0.1" max="5" min="1" defaultValue={editingDeal.rating} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} required />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#a16207' }}>Product Image</label>
+                <input name="image" type="file" accept="image/*" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #fde047', boxSizing: 'border-box' }} />
+                {editingDeal.image && <p style={{ fontSize: '12px', color: '#a16207', margin: '4px 0 0 0' }}>Current: {editingDeal.image.split('/').pop()}</p>}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <button type="button" onClick={() => setEditingDeal(null)} style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'white', color: '#854d0e' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '10px', backgroundColor: '#eab308', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save Deal</button>
               </div>
             </form>
           </div>

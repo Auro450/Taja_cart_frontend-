@@ -81,8 +81,7 @@ body {
   border-bottom-right-radius: 20px;
   position: sticky;
   top: 0;
-  z-index: 100;
-  overflow: hidden;
+  z-index: 1100;
 }
 
 /* Announcement Bar */
@@ -487,7 +486,7 @@ body {
   padding: 10px 0;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border-color);
-  z-index: 20;
+  z-index: 1000;
 }
 .nav-tab {
   display: flex;
