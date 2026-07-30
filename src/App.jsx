@@ -1027,9 +1027,9 @@ function App() {
       <div className="static-banners-section" style={{ overflow: 'hidden', margin: '8px 16px', borderRadius: '12px' }}>
         <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', scrollbarWidth: 'none', msOverflowStyle: 'none', snapType: 'x mandatory', paddingBottom: '4px' }}>
           {[
-            'https://placehold.co/800x300/166534/FFFFFF/png?text=FARM+FRESH',
-            'https://placehold.co/800x300/166534/FFFFFF/png?text=FREE+&+FAST+DELIVERY',
-            'https://placehold.co/800x300/166534/FFFFFF/png?text=100%25+TRUSTED'
+            '/banner1.png',
+            '/banner2.png',
+            '/banner3.png'
           ].map((src, idx) => (
             <img 
               key={idx} 
