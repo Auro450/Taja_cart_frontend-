@@ -1036,7 +1036,7 @@ function App() {
               src={src} 
               alt="Promo" 
               onClick={() => setActiveTab('category')}
-              style={{ flex: '0 0 90%', width: '90%', height: '140px', objectFit: 'cover', borderRadius: '12px', scrollSnapAlign: 'start', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }} 
+              style={{ flex: '0 0 100%', width: '100%', height: '140px', objectFit: 'cover', borderRadius: '12px', scrollSnapAlign: 'start', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }} 
             />
           ))}
         </div>
