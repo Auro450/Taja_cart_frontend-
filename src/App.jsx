@@ -1025,7 +1025,7 @@ function App() {
 
       {/* Static Green Scrollable Banners */}
       <div className="static-banners-section" style={{ overflow: 'hidden', margin: '8px 16px', borderRadius: '12px' }}>
-        <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', scrollbarWidth: 'none', msOverflowStyle: 'none', snapType: 'x mandatory', paddingBottom: '4px' }}>
+        <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', scrollbarWidth: 'none', msOverflowStyle: 'none', scrollSnapType: 'x mandatory', paddingBottom: '4px' }}>
           {[
             '/banner1.png',
             '/banner2.png',
@@ -1036,7 +1036,7 @@ function App() {
               src={src} 
               alt="Promo" 
               onClick={() => setActiveTab('category')}
-              style={{ flex: '0 0 100%', width: '100%', height: '140px', objectFit: 'cover', borderRadius: '12px', scrollSnapAlign: 'start', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }} 
+              style={{ flex: '0 0 100%', width: '100%', height: 'auto', aspectRatio: '3/2', objectFit: 'cover', borderRadius: '12px', scrollSnapAlign: 'start', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }} 
             />
           ))}
         </div>
@@ -1105,7 +1105,7 @@ function App() {
       {/* Dynamic Banners */}
       {banners.length > 0 && (
         <div className="banner-section mb-4" style={{ marginTop: '16px', marginLeft: '16px', marginRight: '16px', overflow: 'hidden', borderRadius: '16px' }}>
-          <div className="banner-scroll-container" ref={bannerScrollRef} style={{ display: 'flex', overflowX: 'auto', scrollBehavior: 'smooth', snapType: 'x mandatory', gap: '16px', padding: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="banner-scroll-container" ref={bannerScrollRef} style={{ display: 'flex', overflowX: 'auto', scrollBehavior: 'smooth', scrollSnapType: 'x mandatory', gap: '16px', padding: 0, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {banners.map((banner, idx) => (
               <img 
                 key={idx} 
