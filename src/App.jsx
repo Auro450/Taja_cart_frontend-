@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -122,11 +123,19 @@ function App() {
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
+
+      // Request notification permissions
+      LocalNotifications.requestPermissions().then(result => {
+        if (result.display === 'granted') {
+          console.log('Notification permissions granted');
+        }
+      });
     }
   }, []);
 
   const [activeTab, setActiveTab] = useLocalStorage('activeTab', 'home');
-  const [activeCategory, setActiveCategory] = useLocalStorage('activeCategory', 'All');
+  const [activeCategory, setActiveCategory] = useLocalStorage('activeCategory', 'Vegetables');
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [cart, setCart] = useLocalStorage('cart', {});
   const [couponCode, setCouponCode] = useLocalStorage('couponCode', '');
   const [appliedCoupon, setAppliedCoupon] = useLocalStorage('appliedCoupon', null);
@@ -157,6 +166,33 @@ function App() {
   const [notifications, setNotifications] = useState([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [dismissedNotifications, setDismissedNotifications] = useLocalStorage('dismissed_notifs_v2', []);
+  const [shownNotifications, setShownNotifications] = useLocalStorage('shown_notifs_v2', []);
+
+  // Trigger Local Notifications for new ones
+  useEffect(() => {
+    if (Capacitor.isNativePlatform() && notifications.length > 0) {
+      const unshown = notifications.filter(n => !shownNotifications.includes(n.id));
+      if (unshown.length > 0) {
+        const notificationsToSchedule = unshown.map((notif, index) => ({
+          title: notif.title,
+          body: notif.message,
+          id: parseInt(notif.id) || Date.now() + index,
+          schedule: { at: new Date(Date.now() + 1000 * (index + 1)) },
+          sound: null,
+          attachments: null,
+          actionTypeId: "",
+          extra: null
+        }));
+
+        LocalNotifications.schedule({ notifications: notificationsToSchedule })
+          .then(() => {
+            setShownNotifications([...shownNotifications, ...unshown.map(n => n.id)]);
+          })
+          .catch(err => console.error('Error scheduling local notification:', err));
+      }
+    }
+  }, [notifications, shownNotifications, setShownNotifications]);
+
   const [dealsOfTheDay, setDealsOfTheDay] = useState([]);
   const [activeOffers, setActiveOffers] = useState([]);
   const [isFirst20Active, setIsFirst20Active] = useState(true);
@@ -242,6 +278,8 @@ function App() {
         setCategoryList(categories);
       } catch (err) {
         console.error('Error fetching inventory:', err);
+      } finally {
+        setIsInitialLoad(false);
       }
     };
     fetchInventory();
@@ -334,12 +372,17 @@ function App() {
 
   const handlePlaceOrder = async () => {
     if (!user) {
-      setIsAuthModalOpen(true);
+      setIsNotificationOpen(true);
       return;
     }
 
-    if (!deliveryDetails.name || !deliveryDetails.phone || !deliveryDetails.street || !deliveryDetails.city) {
-      alert("Please fill in your Name, Phone Number, Street, and City.");
+    if (!deliveryDetails.name || !deliveryDetails.phone || !deliveryDetails.building) {
+      alert("Please fill in your Name, Phone Number, and Building Name / House No.");
+      return;
+    }
+    
+    if (deliveryDetails.phone.length < 10) {
+      alert("Please enter a valid 10-digit mobile number");
       return;
     }
 
@@ -353,7 +396,15 @@ function App() {
 
     try {
       if (saveAddressLabel.trim() && user.email) {
-        const addressStr = `${deliveryDetails.building ? deliveryDetails.building + ', ' : ''}${deliveryDetails.street}, ${deliveryDetails.locality}, ${deliveryDetails.city}, ${deliveryDetails.state}`;
+        const addressParts = [
+          deliveryDetails.building,
+          deliveryDetails.street,
+          deliveryDetails.locality,
+          deliveryDetails.city,
+          deliveryDetails.state
+        ].filter(Boolean);
+        const addressStr = addressParts.join(', ');
+        
         fetch('https://api.tajacart.in/api/addresses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -630,6 +681,14 @@ function App() {
   const isOutOfRange = activeHubs.length > 0 && deliveryDetails.lat && deliveryDetails.lng 
     ? !activeHubs.some(hub => getDistanceFromLatLonInKm(deliveryDetails.lat, deliveryDetails.lng, hub.lat, hub.lng) <= hub.radius_km)
     : false;
+
+  if (isInitialLoad) {
+    return (
+      <div className="skeleton-loader-container">
+        <img src="/cart_filled_transparent.png" alt="Loading Tajacart..." className="skeleton-pulse-logo" />
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -963,6 +1022,25 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Static Green Scrollable Banners */}
+      <div className="static-banners-section" style={{ overflow: 'hidden', margin: '8px 16px', borderRadius: '12px' }}>
+        <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', scrollbarWidth: 'none', msOverflowStyle: 'none', snapType: 'x mandatory', paddingBottom: '4px' }}>
+          {[
+            'https://placehold.co/800x300/166534/FFFFFF/png?text=FARM+FRESH',
+            'https://placehold.co/800x300/166534/FFFFFF/png?text=FREE+&+FAST+DELIVERY',
+            'https://placehold.co/800x300/166534/FFFFFF/png?text=100%25+TRUSTED'
+          ].map((src, idx) => (
+            <img 
+              key={idx} 
+              src={src} 
+              alt="Promo" 
+              onClick={() => setActiveTab('category')}
+              style={{ flex: '0 0 90%', width: '90%', height: '140px', objectFit: 'cover', borderRadius: '12px', scrollSnapAlign: 'start', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }} 
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Deals of the Day */}
       <div className="section mt-2" style={{ padding: '16px 0', backgroundColor: 'var(--white)' }}>
