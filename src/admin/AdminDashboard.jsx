@@ -15,8 +15,8 @@ function AdminDashboard() {
   const fetchData = async () => {
     try {
       const [ordersRes, customersRes] = await Promise.all([
-        fetch('http://localhost:3000/api/orders'),
-        fetch('http://localhost:3000/api/customers')
+        fetch('http://192.168.0.112:3000/api/orders'),
+        fetch('http://192.168.0.112:3000/api/customers')
       ]);
       const ordersData = await ordersRes.json();
       const customersData = await customersRes.json();
