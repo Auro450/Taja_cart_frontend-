@@ -1,4 +1,4 @@
-package com.taja.cart;
+package com.tajacart.app;
 
 import com.getcapacitor.BridgeActivity;
 
