@@ -33,17 +33,17 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build Debug AAB
+      - name: Build Release AAB
         working-directory: ./android
         run: |
           mkdir -p ~/.android
           cp ../tajacart-upload-key.jks ~/.android/debug.keystore
           sed -i 's/\r$//' gradlew
           chmod +x ./gradlew
-          ./gradlew bundleDebug
+          ./gradlew bundleRelease
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TajaCart-AAB
-          path: android/app/build/outputs/bundle/debug/app-debug.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
