@@ -36,6 +36,8 @@ jobs:
       - name: Build Debug AAB
         working-directory: ./android
         run: |
+          mkdir -p ~/.android
+          cp ../tajacart-upload-key.jks ~/.android/debug.keystore
           sed -i 's/\r$//' gradlew
           chmod +x ./gradlew
           ./gradlew bundleDebug
